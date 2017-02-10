@@ -13,6 +13,13 @@ DATA_16_BANDS='../input/sixteen_band/'
 GENERATED_DATA_16_BANDS = "../input/generated/"
 TRAIN_LABELS = '../input/labels'
 
+if not os.path.exists(GENERATED_DATA_16_BANDS):
+    os.makedirs(GENERATED_DATA_16_BANDS)
+
+if not os.path.exists(TRAIN_LABELS):
+    os.makedirs(TRAIN_LABELS)
+
+
 def generate_pansharpened(image_id, image_type):
     """
     Method to create pansharpened images from multispectral or swir images

@@ -131,14 +131,15 @@ def generate_label_image(image_id):
     out_size = get_image_data(image_id, 'pan', return_shape_only=True)
     out = np.zeros(out_size[:2], np.uint8)
     round_coords = lambda x: np.array(x).round().astype(np.int32)    
-    for class_type in ORDERED_LABEL_IDS:
+    for i, class_type in enumerate(ORDERED_LABEL_IDS):
         if class_type not in rpolygons:
             continue
         one_class_mask = np.zeros(out_size[:2], np.uint8)
         for polygon in rpolygons[class_type]:
             exterior = [round_coords(polygon.exterior.coords)]
-            interiors = [round_coords(poly.coords) for poly in polygon.interiors]
-            cv2.fillPoly(one_class_mask, exterior, class_type)
-            cv2.fillPoly(one_class_mask, interiors, 0)
+            cv2.fillPoly(one_class_mask, exterior, i)
+            if len(polygon.interiors) > 0:
+                interiors = [round_coords(poly.coords) for poly in polygon.interiors]
+                cv2.fillPoly(one_class_mask, interiors, 0)
         out = np.maximum(out, one_class_mask)
     return out

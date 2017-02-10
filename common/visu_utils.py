@@ -2,13 +2,14 @@ import logging
 
 import numpy as np
 import matplotlib.pylab as plt
-from matplotlib.patches import Rectangle, Polygon, Patch
+from matplotlib.patches import Polygon, Patch
 
 from shapely.geometry import box
 from shapely.affinity import translate
 from shapely.validation import explain_validity
 
 from data_utils import ORDERED_LABEL_IDS, LABELS
+
 
 def scale_percentile(matrix):
     if len(matrix.shape) == 2:
@@ -43,6 +44,7 @@ def display_img_3b(img_3b_data, roi=None):
         plt.imshow(scale_percentile(img_3b_data[:,:,i]), cmap='gray')
         plt.title("Channel %i" % i)
 
+
 def display_img_8b(img_ms_data, roi=None):
     if roi is not None:
         # roi is [minx, miny, maxx, maxy]
@@ -72,7 +74,8 @@ def display_labels(label_img, alpha=0.5, roi=None, ax_array=None, show_legend=Tr
         
     if show_legend:
         legend_handles = []
-        for i, class_type in enumerate(LABELS):
+        for i in range(len(ORDERED_LABEL_IDS)):
+            class_type = LABELS[ORDERED_LABEL_IDS[i]]
             legend_handles.append(Patch(color=cmap(i), label='{}'.format(class_type)))
             
         index = 0 if len(ax_array) == 1 else len(ax_array)//2 - 1
@@ -84,6 +87,7 @@ def display_labels(label_img, alpha=0.5, roi=None, ax_array=None, show_legend=Tr
                   fontsize='x-small',
                   title='Objects:',
                   framealpha=0.3)
+
 
 def display_polygons(polygons, roi=None, ax_array=None, show_legend=True):
     if roi is not None:
