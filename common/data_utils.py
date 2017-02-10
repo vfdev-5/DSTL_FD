@@ -6,6 +6,8 @@ import gdalconst
 DATA_3_BANDS='../input/three_band/'
 DATA_16_BANDS='../input/sixteen_band/'
 
+assert os.path.exists('../input'), "Please download Kaggle input data into 'input' folder"
+
 GRID_SIZE = pd.read_csv('../input/grid_sizes.csv',
                         names=['ImageId', 'Xmax', 'Ymin'],
                         skiprows=1)
