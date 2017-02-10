@@ -8,7 +8,7 @@ from shapely.geometry import box
 from shapely.affinity import translate
 from shapely.validation import explain_validity
 
-from data_utils import LABELS
+from data_utils import ORDERED_LABEL_IDS, LABELS
 
 def scale_percentile(matrix):
     if len(matrix.shape) == 2:
@@ -57,6 +57,34 @@ def display_img_8b(img_ms_data, roi=None):
     return ax_array
 
 
+def display_labels(label_img, alpha=0.5, roi=None, ax_array=None, show_legend=True):
+    if roi is not None:
+        # roi is [minx, miny, maxx, maxy]
+        x,y,xw,yh = roi
+        label_img = label_img[y:yh,x:xw]
+    
+    cmap = plt.get_cmap('Paired', 10)
+    if ax_array is None:
+        ax_array = [plt.gca()]
+        
+    for ax in ax_array:
+        ax.imshow(label_img, cmap=cmap, alpha=alpha)
+        
+    if show_legend:
+        legend_handles = []
+        for i, class_type in enumerate(LABELS):
+            legend_handles.append(Patch(color=cmap(i), label='{}'.format(class_type)))
+            
+        index = 0 if len(ax_array) == 1 else len(ax_array)//2 - 1
+        ax = ax_array[index]
+        ax.legend(handles=legend_handles, 
+                  bbox_to_anchor=(1.05, 1), 
+                  loc=2, 
+                  borderaxespad=0.,
+                  fontsize='x-small',
+                  title='Objects:',
+                  framealpha=0.3)
+
 def display_polygons(polygons, roi=None, ax_array=None, show_legend=True):
     if roi is not None:
         # roi is [minx, miny, maxx, maxy]
@@ -64,8 +92,21 @@ def display_polygons(polygons, roi=None, ax_array=None, show_legend=True):
     if ax_array is None:
         ax_array = [plt.gca()]
 
+    cmap = plt.get_cmap('Paired', len(LABELS))
+    
+    def _draw_polygon(ax, polygon, class_type):
+        _add_mpl_polygon(ax, polygon.exterior, cmap(class_type))
+        for lin_ring in polygon.interiors:
+            _add_mpl_polygon(ax, lin_ring, 'k')
+    
+    def _add_mpl_polygon(ax, linear_ring, color):
+        mpl_poly = Polygon(np.array(linear_ring), color=color, lw=0, alpha=0.5)
+        ax.add_patch(mpl_poly)
+        
     legend_handles = []
-    for class_type in polygons:
+    for class_type in ORDERED_LABEL_IDS:
+        if class_type not in polygons:
+            continue
         for i, polygon in enumerate(polygons[class_type]):     
             draw_polygon = roi is None
             if roi is not None and polygon.intersects(b):
@@ -79,14 +120,12 @@ def display_polygons(polygons, roi=None, ax_array=None, show_legend=True):
                 if polygon.type == 'MultiPolygon':
                     for p in polygon:
                         for ax in ax_array:
-                            mpl_poly = Polygon(np.array(p.exterior), color=plt.get_cmap('jet')(class_type*25), lw=0, alpha=0.3)
-                            ax.add_patch(mpl_poly)
+                            _draw_polygon(ax, p, class_type)
                 else:
                     for ax in ax_array:
-                        mpl_poly = Polygon(np.array(polygon.exterior), color=plt.get_cmap('jet')(class_type*25), lw=0, alpha=0.3)
-                        ax.add_patch(mpl_poly)
+                        _draw_polygon(ax, polygon, class_type)
 
-        legend_handles.append(Patch(color=plt.get_cmap('jet')(class_type*25), label='{} ({})'.format(LABELS[class_type], len(polygons[class_type]))))
+        legend_handles.append(Patch(color=cmap(class_type), label='{} ({})'.format(LABELS[class_type], len(polygons[class_type]))))
 
     for ax in ax_array:
         ax.relim()

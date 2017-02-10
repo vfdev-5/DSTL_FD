@@ -6,10 +6,12 @@ import gdal
 import gdalconst
 from gdal_pansharpen import gdal_pansharpen
 
+
+
 DATA_3_BANDS='../input/three_band/'
 DATA_16_BANDS='../input/sixteen_band/'
 GENERATED_DATA_16_BANDS = "../input/generated/"
-
+TRAIN_LABELS = '../input/labels'
 
 def generate_pansharpened(image_id, image_type):
     """
@@ -32,6 +34,7 @@ def get_filename(image_id, image_type):
     """
     Method to get image file path from its id and type   
     """
+    ext = 'tif'
     if image_type == '3b':
         data_path = DATA_3_BANDS
         suffix = ''
@@ -50,10 +53,13 @@ def get_filename(image_id, image_type):
     elif image_type == 'swir_pan':
         data_path = GENERATED_DATA_16_BANDS
         suffix = '_A_P'
+    elif image_type == 'label':
+        data_path = TRAIN_LABELS
+        suffix = ''
     else:
         raise Exception("Image type '%s' is not recognized" % image_type)
         
-    return os.path.join(data_path, "{}{}.tif".format(image_id, suffix))
+    return os.path.join(data_path, "{}{}.{}".format(image_id, suffix, ext))
 
 
 def get_image_data(image_id, image_type, return_shape_only=False):
