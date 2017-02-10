@@ -1,0 +1,69 @@
+
+
+# http://adaptivepatchwork.com/2012/03/01/mind-the-end-of-your-line/
+
+# Handle line endings automatically for files detected as text
+# and leave all files detected as binary untouched.
+# Subsequent lines can override that setting.
+* text=auto
+
+#
+# The above will handle all files NOT found below
+#
+# These files are text and should be normalized (Convert crlf => lf)
+*.gitattributes text
+*.less          text
+*.css           text
+*.csv           text
+*.df            text
+*.gpx           text
+*.htm           text diff=html
+*.html          text diff=html
+*.ini           text
+*.java          text diff=java
+*.js            text diff=javascript
+*.json          text diff=javascript
+*.jsp           text
+*.jspf          text
+*.kml           text diff=xml
+*.py            text diff=python
+*.prefs         text
+*.properties    text
+*.sh            text eol=lf
+*.svg           text
+*.tld           text
+*.ts            text
+*.txt           text
+*.xml           text diff=xml
+*.xhtml         text diff=xml
+
+# These files are binary and should be left untouched
+# (binary is a macro for -text -diff)
+*.7z            binary
+*.class         binary
+*.dll           binary
+*.doc           binary
+*.docx          binary
+*.ear           binary
+*.eot           binary
+*.gif           binary
+*.ico           binary
+*.jar           binary
+*.jpg           binary
+*.jpeg          binary
+*.kmz           binary
+*.mov           binary
+*.mp3           binary
+*.mp4           binary
+*.pdf           binary
+*.png           binary
+*.pyc           binary
+*.so            binary
+*.ttf           binary
+*.war           binary
+*.webm          binary
+*.woff          binary
+*.xlsx          binary
+*.zip           binary
+
+
