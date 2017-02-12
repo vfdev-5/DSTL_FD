@@ -1,4 +1,5 @@
 import os
+import logging
 import numpy as np
 import pandas as pd
 
@@ -8,7 +9,7 @@ import cv2
 from shapely.wkt import loads
 from shapely.affinity import scale
 
-from image_utils import get_image_data, get_filename
+from image_utils import get_image_data, get_filename, imwrite
 
 assert os.path.exists('../input'), "Please download Kaggle input data into 'input' folder"
 
@@ -85,6 +86,7 @@ FULL_LABELS = [
     "Vehicle Small - small vehicle (car, van), motorbike",
 ]
 
+
 def get_unit_polygons(image_id):
     polygons = {}
     image_polygons = TRAIN_WKT[TRAIN_WKT['ImageId'] == image_id]
@@ -120,11 +122,22 @@ def get_resized_polygons(image_id, image_type):
     return resized_polygons
     
 
-def generate_label_file(image_id):
-    image_data = generate_label_image(image_id)
-    outfname = get_filename(image_id, 'label')
-    cv2.imwrite(outfname, image_data)
-    
+def generate_label_file(image_id, multi_dim=True):
+    if multi_dim:
+        outfname = get_filename(image_id, 'label')
+        if os.path.exists(outfname):
+            logging.warn("File '%s' is already existing" % outfname)
+            return
+        image_data = generate_label_image2(image_id)
+        imwrite(outfname, image_data)
+    else:
+        outfname = get_filename(image_id, 'label_1d')
+        if os.path.exists(outfname):
+            logging.warn("File '%s' is already existing" % outfname)
+            return
+        image_data = generate_label_image(image_id)
+        cv2.imwrite(outfname, image_data)
+
     
 def generate_label_image(image_id):
     rpolygons = get_resized_polygons(image_id, 'pan')
@@ -142,4 +155,25 @@ def generate_label_image(image_id):
                 interiors = [round_coords(poly.coords) for poly in polygon.interiors]
                 cv2.fillPoly(one_class_mask, interiors, 0)
         out = np.maximum(out, one_class_mask)
+    return out
+
+
+def generate_label_image2(image_id):
+    rpolygons = get_resized_polygons(image_id, 'pan')
+    out_size = get_image_data(image_id, 'pan', return_shape_only=True)
+    out = np.zeros(out_size[:2] + (len(LABELS), ), np.uint8)
+    out[:,:,0] = 1
+    round_coords = lambda x: np.array(x).round().astype(np.int32)
+    for class_type in range(1, len(LABELS)):
+        if class_type not in rpolygons:
+            continue
+        one_class_mask = np.zeros(out_size[:2], np.uint8)
+        for polygon in rpolygons[class_type]:
+            exterior = [round_coords(polygon.exterior.coords)]
+            cv2.fillPoly(one_class_mask, exterior, 1)
+            if len(polygon.interiors) > 0:
+                interiors = [round_coords(poly.coords) for poly in polygon.interiors]
+                cv2.fillPoly(one_class_mask, interiors, 0)
+        out[:,:,class_type] = one_class_mask
+        out[:,:,0] -= one_class_mask
     return out

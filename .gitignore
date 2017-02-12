@@ -7,7 +7,7 @@ results/*.csv
 *.binproto
 *.caffemodel
 *.solverstate
-
+*.h5
 
 ## Linux backup files
 *~

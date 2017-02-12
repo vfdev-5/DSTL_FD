@@ -9,30 +9,29 @@ from shapely.affinity import translate
 from shapely.validation import explain_validity
 
 from data_utils import ORDERED_LABEL_IDS, LABELS
+from image_utils import normalize
 
 
 def scale_percentile(matrix):
+    is_gray = False
     if len(matrix.shape) == 2:
+        is_gray = True
         matrix = matrix.reshape(matrix.shape + (1,))
-    w, h, d = matrix.shape
-    matrix = np.reshape(matrix, [w * h, d]).astype(np.float64)
-    mins = np.percentile(matrix, 0.5, axis=0)
-    maxs = np.percentile(matrix, 99.5, axis=0) - mins
-    matrix = 255*(matrix - mins[None, :]) / maxs[None, :]
-    matrix = np.reshape(matrix, [w, h, d] if d > 1 else [w, h])
-    matrix = matrix.clip(0, 255).astype(np.uint8)
+    matrix = (255*normalize(matrix)).astype(np.uint8)
+    if is_gray:
+        matrix = matrix.reshape(matrix.shape[:2])
     return matrix
 
 
-def display_img_1b(img_1b_data, roi=None):
+def display_img_1b(img_1b_data, roi=None, **kwargs):
     if roi is not None:
         # roi is [minx, miny, maxx, maxy]
         x,y,xw,yh = roi
         img_1b_data = img_1b_data[y:yh,x:xw]
-    plt.imshow(scale_percentile(img_1b_data), cmap='gray')
+    plt.imshow(scale_percentile(img_1b_data), cmap='gray', **kwargs)
 
 
-def display_img_3b(img_3b_data, roi=None):
+def display_img_3b(img_3b_data, roi=None, **kwargs):
     if roi is not None:
         # roi is [minx, miny, maxx, maxy]
         x,y,xw,yh = roi
@@ -41,11 +40,11 @@ def display_img_3b(img_3b_data, roi=None):
     for i in [0,1,2]:
         ax = plt.subplot(1,3,i+1)
         ax_array.append(ax)
-        plt.imshow(scale_percentile(img_3b_data[:,:,i]), cmap='gray')
+        plt.imshow(scale_percentile(img_3b_data[:,:,i]), cmap='gray', **kwargs)
         plt.title("Channel %i" % i)
 
 
-def display_img_8b(img_ms_data, roi=None):
+def display_img_8b(img_ms_data, roi=None, **kwargs):
     if roi is not None:
         # roi is [minx, miny, maxx, maxy]
         x,y,xw,yh = roi
@@ -54,12 +53,12 @@ def display_img_8b(img_ms_data, roi=None):
     for i in range(8):
         ax = plt.subplot(2,4,i+1)
         ax_array.append(ax)
-        plt.imshow(scale_percentile(img_ms_data[:,:,i]), cmap='gray')
+        plt.imshow(scale_percentile(img_ms_data[:,:,i]), cmap='gray', **kwargs)
         plt.title("Channel %i" % i)
     return ax_array
 
 
-def display_labels(label_img, alpha=0.5, roi=None, ax_array=None, show_legend=True):
+def display_labels(label_img, roi=None, ax_array=None, show_legend=True, **kwargs):
     if roi is not None:
         # roi is [minx, miny, maxx, maxy]
         x,y,xw,yh = roi
@@ -70,7 +69,7 @@ def display_labels(label_img, alpha=0.5, roi=None, ax_array=None, show_legend=Tr
         ax_array = [plt.gca()]
         
     for ax in ax_array:
-        ax.imshow(label_img, cmap=cmap, alpha=alpha)
+        ax.imshow(label_img, cmap=cmap, **kwargs)
         
     if show_legend:
         legend_handles = []
