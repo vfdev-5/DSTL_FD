@@ -99,6 +99,16 @@ class GeoImage:
         if len(filename) > 0:
             self.open(filename)
 
+    def close(self):
+        self._dataset = None
+        self.shape = None
+        self.geo_extent = None
+        self.metadata = None
+        self.gcps = None
+        self.gcp_projection = None
+        self._pix2geo = None
+        self._subsets = []
+            
     @staticmethod
     def from_dataset(dataset):
         gimage = GeoImage()

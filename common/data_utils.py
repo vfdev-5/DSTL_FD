@@ -175,5 +175,5 @@ def generate_label_image2(image_id):
                 interiors = [round_coords(poly.coords) for poly in polygon.interiors]
                 cv2.fillPoly(one_class_mask, interiors, 0)
         out[:,:,class_type] = one_class_mask
-        out[:,:,0] -= one_class_mask
+        out[:,:,0] = np.bitwise_xor(out[:,:,0], np.bitwise_and(out[:,:,0], one_class_mask)) # =x ^ (x & y)        
     return out

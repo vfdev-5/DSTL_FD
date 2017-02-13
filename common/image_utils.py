@@ -196,6 +196,7 @@ def normalize(in_img, q_min=0.5, q_max=99.5):
     img = np.reshape(img, [w * h, d]).astype(np.float64)
     mins = np.percentile(img, q_min, axis=0)
     maxs = np.percentile(img, q_max, axis=0) - mins
+    maxs[(maxs < 0.0001) & (maxs > -0.0001)] = 0.0001
     img = (img - mins[None, :]) / maxs[None, :]
     img = img.clip(0.0, 1.0)
     img = np.reshape(img, [w, h, d])
