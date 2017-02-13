@@ -17,6 +17,8 @@ TRAIN_LABELS = '../input/labels'
 
 TRAIN_TILES = '../input/train'
 TRAIN_LABEL_TILES = '../input/train/labels'
+TRAIN_LABEL_TILES_1D = '../input/train/labels_1d'
+
 
 if not os.path.exists(GENERATED_DATA_16_BANDS):
     os.makedirs(GENERATED_DATA_16_BANDS)
@@ -30,6 +32,9 @@ if not os.path.exists(TRAIN_TILES):
 if not os.path.exists(TRAIN_LABEL_TILES):
     os.makedirs(TRAIN_LABEL_TILES)
 
+if not os.path.exists(TRAIN_LABEL_TILES_1D):
+    os.makedirs(TRAIN_LABEL_TILES_1D)
+   
 
 def generate_aligned_swir(image_id):
     """
@@ -73,6 +78,9 @@ def get_tile_filename(image_id, xoffset, yoffset, image_type):
         ext = 'tif'
     elif image_type == 'label':
         dir_path = TRAIN_LABEL_TILES
+        ext = 'tif'
+    elif image_type == 'label_1d':
+        dir_path = TRAIN_LABEL_TILES_1D
         ext = 'tif'
     else:
         raise Exception("Unknown image type: {}".format(image_type))
