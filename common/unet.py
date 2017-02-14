@@ -68,10 +68,19 @@ def unet_zero(n_classes, n_channels, input_width, input_height):
     model = Model(input=inputs, output=output)
     return model
 
+    
+def channels_ratio(input_layer):
+    pass
 
+    
+def channels_ratio_shape(input_shape):
+    h, w, k, n = input_shape
+    
+   
 def unet_one(n_classes, n_channels, input_width, input_height):
 
     inputs = Input((n_channels, input_height, input_width))
+    #inputs = Lambda(channel_ratio, output_shape=channels_ratio_shape)
         
     conv1 = _conv1(32)(inputs)
     conv1 = _conv1(32)(conv1)

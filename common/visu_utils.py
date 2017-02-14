@@ -64,12 +64,15 @@ def display_labels(label_img, roi=None, ax_array=None, show_legend=True, **kwarg
         x,y,xw,yh = roi
         label_img = label_img[y:yh,x:xw]
     
-    cmap = plt.get_cmap('Paired', 10)
+    if 'cmap' not in kwargs:
+        kwargs['cmap'] = plt.get_cmap('Paired', 11)
+    cmap = kwargs['cmap'] if not isinstance(kwargs['cmap'], str) else plt.get_cmap(kwargs['cmap'])
+   
     if ax_array is None:
         ax_array = [plt.gca()]
         
     for ax in ax_array:
-        ax.imshow(label_img, cmap=cmap, **kwargs)
+        ax.imshow(label_img, **kwargs)
         
     if show_legend:
         legend_handles = []
