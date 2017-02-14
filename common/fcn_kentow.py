@@ -1,11 +1,10 @@
 # https://raw.githubusercontent.com/k3nt0w/FCN_via_keras/master/FCN.py
 
-from keras.layers import merge, Convolution2D, Deconvolution2D, MaxPooling2D, Input, Reshape, Permute, Cropping2D, Flatten
+import keras_conf
+
+from keras.layers import merge, Convolution2D, Deconvolution2D, MaxPooling2D, Input, Reshape, Cropping2D, Flatten
 from keras.layers.core import Activation
 from keras.models import Model
-from keras.backend import set_image_dim_ordering
-
-set_image_dim_ordering('th')
 
 
 def fcn_zero(n_classes, nb_channels, input_width, input_height):
