@@ -50,7 +50,7 @@ def generate_aligned_swir(image_id):
     img_pan = get_image_data(image_id, 'pan')
     img_swir = get_image_data(image_id, 'swir')
     img_swir_aligned = align_images(img_pan, img_swir, roi=[0, 0, 500, 500], warp_mode=cv2.MOTION_EUCLIDEAN)
-
+    
     img_swir_aligned = img_swir if img_swir_aligned is None else img_swir_aligned
     imwrite(outfname, img_swir_aligned)
 
@@ -275,3 +275,53 @@ def align_images(img_master, img_slave, roi, warp_mode=cv2.MOTION_EUCLIDEAN):
             return None
 
     return img_slave_aligned
+    
+    
+def make_ratios_vegetation(img_17b):
+    """
+        Method creates an image of all possible band ratios
+        
+        - panchromatic[0] / MS[5] = Trees, Crops, Misc manmade structures (of trees) 
+        - panchromatic[0] / MS[4] = Trees, Crops, Misc manmade structures (of trees) 
+        - MS[1] / MS[5] = Trees, Crops, Misc manmade structures (of trees) 
+        - MS[2] / MS[5] = Trees, Crops, Misc manmade structures (of trees) 
+        - MS[6] / MS[4] = Trees, Crops, Misc manmade structures (of trees) 
+        - MS[6] / MS[5] = Trees, Crops, Misc manmade structures (of trees) 
+        - MS[7] / MS[4] = Trees, Crops, Misc manmade structures (of trees) 
+        - MS[7] / MS[5] = Trees, Crops, Misc manmade structures (of trees) 
+        - MS[7] / MS[10:17] = Trees, Crops, Misc manmade structures (of trees) 
+        - MS[8] / MS[4] = Trees, Crops, Misc manmade structures (of trees) 
+        - MS[8:17] / MS[5] = Trees, Crops, Misc manmade structures (of trees) 
+    """
+    h, w, n = img_17b.shape
+    
+    out_n = 23
+    out = np.zeros((h, w, out_n), dtype=np.float32)
+    def _ratio(i, j):
+        return img_17b[:,:,i] / (img_17b[:,:,j] + 0.00001)
+
+    c = 0
+    out[:,:,c] = _ratio(0, 5); c+= 1
+    out[:,:,c] = _ratio(0, 4); c+= 1
+    out[:,:,c] = _ratio(1, 5); c+= 1
+    out[:,:,c] = _ratio(2, 5); c+= 1
+    out[:,:,c] = _ratio(6, 4); c+= 1
+    out[:,:,c] = _ratio(6, 5); c+= 1
+    out[:,:,c] = _ratio(7, 5); c+= 1
+    out[:,:,c] = _ratio(7, 4); c+= 1
+    out[:,:,c] = _ratio(8, 4); c+= 1
+    out[:,:,c] = _ratio(7, 10); c+= 1
+    out[:,:,c] = _ratio(7, 11); c+= 1
+    out[:,:,c] = _ratio(7, 12); c+= 1
+    out[:,:,c] = _ratio(7, 13); c+= 1
+    out[:,:,c] = _ratio(7, 14); c+= 1
+    out[:,:,c] = _ratio(7, 15); c+= 1
+    out[:,:,c] = _ratio(7, 16); c+= 1
+    out[:,:,c] = _ratio(9, 5); c+= 1
+    out[:,:,c] = _ratio(10, 5); c+= 1
+    out[:,:,c] = _ratio(11, 5); c+= 1
+    out[:,:,c] = _ratio(12, 5); c+= 1
+    out[:,:,c] = _ratio(13, 5); c+= 1
+    out[:,:,c] = _ratio(14, 5); c+= 1
+    out[:,:,c] = _ratio(15, 5); c+= 1
+    return out
