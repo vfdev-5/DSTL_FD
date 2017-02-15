@@ -221,7 +221,7 @@ def get_gradient(im):
     return grad
 
 
-def align_images(img_master, img_slave, roi, warp_mode=cv2.MOTION_EUCLIDEAN):
+def align_images(img_master, img_slave, roi, warp_mode=cv2.MOTION_TRANSLATION):
     """
     Code taken from http://www.learnopencv.com/image-alignment-ecc-in-opencv-c-python/
     """
@@ -232,47 +232,64 @@ def align_images(img_master, img_slave, roi, warp_mode=cv2.MOTION_EUCLIDEAN):
     img_slave_roi = img_slave[roi_slave[1]:roi_slave[3], roi_slave[0]:roi_slave[2], :].astype(np.float32)
 
     img_master_roi = img_master[roi[1]:roi[3], roi[0]:roi[2]].astype(np.float32)
-    img_master_roi = cv2.resize(img_master_roi, dsize=(img_slave_roi.shape[1], img_slave_roi.shape[0]))
+    img_master_roi = cv2.resize(img_master_roi, dsize=(img_slave_roi.shape[1], img_slave_roi.shape[0]), interpolation=cv2.INTER_NEAREST)
 
     img_master_roi = get_gradient(img_master_roi)
     img_slave_roi = get_gradient(img_slave_roi)
 
     img_slave_aligned = np.zeros_like(img_slave)
 
+    height, width, ll = img_slave.shape
+
     # Set the warp matrix to identity.
     if warp_mode == cv2.MOTION_HOMOGRAPHY:
-        warp_matrix = np.eye(3, 3, dtype=np.float32)
+        mean_warp_matrix = np.zeros((3, 3), dtype=np.float32)
     else:
-        warp_matrix = np.eye(2, 3, dtype=np.float32)
+        mean_warp_matrix = np.zeros((2, 3), dtype=np.float32)
 
-    ll = img_slave.shape[2]
     for i in range(ll):
-        # Set the stopping criteria for the algorithm.
-        criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 5000, 1e-1)
-        try:
-            cc, warp_matrix = cv2.findTransformECC(img_master_roi, img_slave_roi[:, :, i], warp_matrix, warp_mode,
-                                                   criteria)
 
-            height, width, _ = img_slave.shape
-            if warp_mode == cv2.MOTION_HOMOGRAPHY:
-                # Use Perspective warp when the transformation is a Homography
-                img_slave_aligned[:, :, i] = cv2.warpPerspective(img_slave[:, :, i],
-                                                                 warp_matrix,
-                                                                 (width, height),
-                                                                 flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP,
-                                                                 borderMode=cv2.BORDER_REFLECT
-                                                                 )
-            else:
-                # Use Affine warp when the transformation is not a Homography
-                img_slave_aligned[:, :, i] = cv2.warpAffine(img_slave[:, :, i],
-                                                            warp_matrix,
-                                                            (width, height),
-                                                            flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP,
-                                                            borderMode=cv2.BORDER_REFLECT
-                                                            );
+        # Set the warp matrix to identity.
+        if warp_mode == cv2.MOTION_HOMOGRAPHY:
+            warp_matrix = np.eye(3, 3, dtype=np.float32)
+        else:
+            warp_matrix = np.eye(2, 3, dtype=np.float32)
+        # Set the stopping criteria for the algorithm.
+        criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 5000, 1e-2)
+        try:
+            cc, warp_matrix = cv2.findTransformECC(img_master_roi,
+                                                   img_slave_roi[:, :, i],
+                                                   warp_matrix,
+                                                   warp_mode,
+                                                   criteria)
         except Exception as e:
             logging.error("Failed to find warp matrix: %s" % str(e))
             return None
+
+        mean_warp_matrix += warp_matrix
+
+    mean_warp_matrix *= 1.0/ll
+    print "Mean Warp matrix: ",
+    print mean_warp_matrix
+
+    for i in range(ll):
+
+        if warp_mode == cv2.MOTION_HOMOGRAPHY:
+            # Use Perspective warp when the transformation is a Homography
+            img_slave_aligned[:, :, i] = cv2.warpPerspective(img_slave[:, :, i],
+                                                             mean_warp_matrix,
+                                                             (width, height),
+                                                             flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP,
+                                                             borderMode=cv2.BORDER_REFLECT
+                                                             )
+        else:
+            # Use Affine warp when the transformation is not a Homography
+            img_slave_aligned[:, :, i] = cv2.warpAffine(img_slave[:, :, i],
+                                                        mean_warp_matrix,
+                                                        (width, height),
+                                                        flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP,
+                                                        borderMode=cv2.BORDER_REFLECT
+                                                        )
 
     return img_slave_aligned
     
