@@ -1,7 +1,7 @@
 import keras_conf
 
 
-from keras.layers import merge, Convolution2D, MaxPooling2D, Input
+from keras.layers import merge, Convolution2D, MaxPooling2D, Input, Permute
 from keras.layers import UpSampling2D, Reshape, Activation, BatchNormalization
 from keras.models import Model
 from keras.regularizers import l2
@@ -91,24 +91,43 @@ class Inverse(Layer):
         eps = K.variable(value=K.epsilon())
         x = K.pow(x + eps, -1.0)
         mean = K.mean(x)
-        var = K.var(x)
-        x = K.batch_normalization(x, mean, var, 0.0, 1.0)
+        std = K.std(x)
+        x -= mean
+        x /= std
         return x
 
     def get_output_shape_for(self, input_shape):
         return input_shape
-    
 
-def conv(input_layer, n_filters_0=16, deep=False, l=0.001):
+
+class Normalization(Layer):
+    """Normalization layer : x -> (x - mean)/std """
+    def __init__(self, **kwargs):
+        super(Normalization, self).__init__(**kwargs)
+        
+    def call(self, x, mask=None):
+        mean = K.mean(x)
+        std = K.std(x)
+        x -= mean
+        x /= std
+        return x
+
+    def get_output_shape_for(self, input_shape):
+        return input_shape           
+        
+
+def conv(input_layer, n_filters_0=16, deep=False, l=0.01):
     """
     """
     x = Convolution2D(n_filters_0, 3, 3,
-                      activation='relu',
+                      activation='elu',
+                      init='he_normal',
                       W_regularizer=l2(l),
                       border_mode='same')(input_layer)
     if deep:
         x = Convolution2D(2 * n_filters_0, 3, 3,
-                          activation='relu',
+                          activation='elu',
+                          init='he_normal',
                           W_regularizer=l2(l),
                           border_mode='same')(x)
     return x
@@ -121,10 +140,36 @@ def conv_downsample(input_layer, **kwargs):
     x = MaxPooling2D(pool_size=(2, 2))(x)
     return x
 
+    
+def _merge(x1, x2):
+    x12 = merge([x1, x2], mode='mul')
+    x12 = Normalization()(x12)   
+    return x12
+
+    
+def multiplication(input_layer, base_unit, **kwargs):    
+    """
+    x -> (x1 *x2)
+    """
+    x1 = base_unit(input_layer, **kwargs)
+    x2 = base_unit(input_layer, **kwargs)
+    return _merge(x1, x2)
+
+    
+def ratio(input_layer, base_unit, **kwargs):
+    """
+    x -> (x1 * 1/x2)
+    """
+    inverse_layer = Inverse()(input_layer)
+
+    x1 = base_unit(input_layer, **kwargs)
+    x2 = base_unit(inverse_layer, **kwargs)
+    return _merge(x1, x2)
+    
 
 def composition(input_layer, base_unit, **kwargs):
     """
-    x -> x1 ; (x2 * 1/x3) ; (x4 * x5) ; 1/x6
+    x -> x1 + (x2 * 1/x3) + (x4 * x5) + 1/x6
     """
     inverse_layer = Inverse()(input_layer)
 
@@ -142,16 +187,49 @@ def composition(input_layer, base_unit, **kwargs):
     x1236 = merge([x16, x23], mode='sum')
     x123456 = merge([x1236, x45], mode='sum')
 
-    x123456 = BatchNormalization()(x123456)
+    x123456 = Normalization()(x123456)
     return x123456
 
+    
+def simple_end_cap(input_layer, n_classes, input_height, input_width):
+    """
+    
+    - last activation by softmax leads to loss and weights equal NaN
+    """
+    x = Convolution2D(n_classes, 1, 1)(input_layer)
+    x = Reshape((n_classes, input_height * input_width))(x)
+    x = Permute((2, 1))(x)
+    x = Activation('sigmoid')(x)
+    x = Permute((2, 1))(x)
+    x = Reshape((n_classes, input_height, input_width))(x)  
+    return x
 
+    
+def end_cap(input_layer, n_classes, input_width, input_height):
+    """
+    - last activation by softmax leads to loss and weights equal NaN
+    """
+    return simple_end_cap(x, n_classes, input_width, input_height)
+
+    
 def upsample_merge(x_small, x_large):
     x_small = UpSampling2D(size=(2, 2))(x_small)
     return merge([x_small, x_large], mode='concat', concat_axis=1)
 
+    
+def unet_one_test(n_classes, n_channels, input_width, input_height, deep=False, n_filters_0=8):
 
-def unet_one(n_classes, n_channels, input_width, input_height, deep=False, n_filters_0=8):
+    inputs = Input((n_channels, input_height, input_width))
+    x = inputs
+    #x = ratio(x, conv, n_filters_0=n_filters_0, deep=deep)
+    x = multiplication(x, conv, n_filters_0=n_filters_0, deep=deep)    
+    outputs = simple_end_cap(x, n_classes, input_width, input_height, activation='sigmoid')
+    
+    model = Model(input=inputs, output=outputs)
+    return model
+    
+    
+def unet_two(n_classes, n_channels, input_width, input_height, deep=False, n_filters_0=8):
 
     inputs = Input((n_channels, input_height, input_width))
     x = inputs

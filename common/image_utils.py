@@ -429,3 +429,31 @@ def make_ratios_vegetation(img_17b):
     out[:,:,c] = _ratio(14, 5); c+= 1
     out[:,:,c] = _ratio(15, 5); c+= 1
     return out
+
+    
+def compute_mean_std_on_set(trainset_ids):
+    """
+    Method to compute mean/std tile image
+    :return: mean_tile_image, std_tile_image
+    """
+    ll = len(trainset_ids)
+    tile_id = trainset_ids[0]
+    tile = get_image_tile_data(os.path.join(TRAIN_TILES,tile_id)).astype(np.float)
+    # Init mean/std images
+    mean_tile_image = np.zeros_like(tile)
+    std_tile_image = np.zeros_like(tile)
+
+    mean_tile_image += tile
+    std_tile_image += np.power(tile, 2)
+
+    for i, tile_id in enumerate(trainset_ids[1:]):
+        logging.info("-- %i/%i | %s" % (i+1, ll, tile_id))
+        tile = get_image_tile_data(os.path.join(TRAIN_TILES,tile_id)).astype(np.float)
+        mean_tile_image += tile
+        std_tile_image += np.power(tile, 2)
+        
+    mean_tile_image *= 1.0/ll
+    std_tile_image *= 1.0/ll
+    std_tile_image -= np.power(mean_tile_image, 2)
+    return mean_tile_image, std_tile_image
+    
