@@ -140,7 +140,6 @@ def get_image_tile_data(fname, return_shape_only=False):
     return img_data
 
 
-
 def get_image_data(image_id, image_type, return_shape_only=False):
     """
     Method to get image data as np.array specifying image id and type
@@ -236,8 +235,6 @@ def compute_alignment_warp_matrix(img_master, img_slave, roi, warp_mode=cv2.MOTI
     img_master_roi = get_gradient(img_master_roi)
     img_slave_roi = get_gradient(img_slave_roi)
 
-    img_slave_aligned = np.zeros_like(img_slave)
-
     height, width, ll = img_slave.shape
 
     # Set the warp matrix to identity.
@@ -268,8 +265,6 @@ def compute_alignment_warp_matrix(img_master, img_slave, roi, warp_mode=cv2.MOTI
         mean_warp_matrix += warp_matrix
 
     mean_warp_matrix *= 1.0/ll
-    #print "Mean Warp matrix: ",
-    #print mean_warp_matrix
     return mean_warp_matrix
 
 

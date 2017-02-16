@@ -28,7 +28,10 @@ def display_img_1b(img_1b_data, roi=None, **kwargs):
         # roi is [minx, miny, maxx, maxy]
         x,y,xw,yh = roi
         img_1b_data = img_1b_data[y:yh,x:xw]
-    plt.imshow(scale_percentile(img_1b_data), cmap='gray', **kwargs)
+
+    if 'cmap' not in kwargs:
+        kwargs['cmap'] = 'gray'
+    plt.imshow(scale_percentile(img_1b_data), **kwargs)
 
 
 def display_img_3b(img_3b_data, roi=None, **kwargs):
