@@ -13,14 +13,16 @@ def conv(input_layer, n_filters_0=16, deep=False, l=0.01):
     """
     """
     x = Convolution2D(n_filters_0, 3, 3,
-                      activation='elu',
-                      init='he_normal',
+                      activation='relu',
+                      #activation='elu',
+                      #init='he_normal',
                       W_regularizer=l2(l),
                       border_mode='same')(input_layer)
     if deep:
         x = Convolution2D(2 * n_filters_0, 3, 3,
-                          activation='elu',
-                          init='he_normal',
+                          activation='relu',
+                          #activation='elu',
+                          #init='he_normal',
                           W_regularizer=l2(l),
                           border_mode='same')(x)
     return x
@@ -105,7 +107,7 @@ def unet_zero(n_classes, n_channels, input_width, input_height, deep=False, n_fi
 
     inputs = Input((n_channels, input_height, input_width))
     x = unet_base(inputs, n_filters_0, deep)
-    outputs = simple_termination(x, n_classes, input_width, input_height)
+    outputs = simple_termination(x, n_classes, input_width, input_height, activation_type='softmax')
     model = Model(input=inputs, output=outputs)
     return model
 
@@ -314,7 +316,7 @@ def unet_two(n_classes, n_channels, input_width, input_height, deep=False, n_fil
     """
     Architecture:
     
-    input -> [[conv]] -> [mix_channels: x + x*1/x + x*x + 1/x] -> [[U-net]] -> [end_cap]
+    input -> [[conv]] -> [mix_channels: x + x*1/x + x*x + 1/x] -> [[U-net]] -> [termination]
    
     """
 
