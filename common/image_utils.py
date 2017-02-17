@@ -447,7 +447,7 @@ def compute_mean_std_on_set(trainset_ids):
     std_tile_image += np.power(tile, 2)
 
     for i, tile_id in enumerate(trainset_ids[1:]):
-        logging.info("-- %i/%i | %s" % (i+1, ll, tile_id))
+        logging.info("-- %i/%i | %s" % (i+2, ll, tile_id))
         tile = get_image_tile_data(os.path.join(TRAIN_TILES,tile_id)).astype(np.float)
         mean_tile_image += tile
         std_tile_image += np.power(tile, 2)
