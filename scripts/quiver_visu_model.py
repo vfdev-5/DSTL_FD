@@ -7,7 +7,7 @@ import sys
 sys.path.append("../common/")
 
 from data_utils import LABELS
-from image_utils import TRAIN_TILES
+from image_utils import TRAIN_DATA
 from unet import unet_zero
 
 
@@ -19,4 +19,4 @@ n_labels = len(labels)
 
 model = unet_zero(n_labels, n_channels, *tile_size, deep=False, n_filters_0=16)
 
-qs.launch(model, classes=np.array(LABELS)[labels].tolist(), input_folder=TRAIN_TILES)
+qs.launch(model, classes=np.array(LABELS)[labels].tolist(), input_folder=TRAIN_DATA)

@@ -280,10 +280,9 @@ def unet_one(n_classes, n_channels, input_width, input_height, deep=False, n_fil
     x = upsample_merge(x, x0)
     x = composition(x, conv, n_filters_0=n_filters_0 * 2, deep=deep)
 
-    outputs = simple_end_cap(x, n_classes, input_width, input_height)    
+    outputs = termination(x, n_classes, input_width, input_height)
     model = Model(input=inputs, output=outputs)
     return model
-
 
 
 def mix_channels(input_layer, base_unit, **kwargs):
@@ -297,16 +296,15 @@ def mix_channels(input_layer, base_unit, **kwargs):
     inverse_layer = Inverse()(input_layer)
     x6 = base_unit(inverse_layer, **kwargs)
 
-    x16 = merge([x1, x6], mode='concat', concat_axis=1)
-    x1236 = merge([x16, x23], mode='concat', concat_axis=1)
-    x123456 = merge([x1236, x45], mode='concat', concat_axis=1)
+    x16 = merge([x1, x6], mode='concat', concat_axis=1, name="merge_x16")
+    x1236 = merge([x16, x23], mode='concat', concat_axis=1, name="merge_x1236")
+    x123456 = merge([x1236, x45], mode='concat', concat_axis=1, name="merge_x123456")
     
     n_filters_0 = kwargs['n_filters_0'] if 'n_filters_0' in kwargs else 16
-    x123456 = Convolution2D(n_filters_0,1,1,          
-                            activation='elu',
-                            init='he_normal',
-                            W_regularizer=l2(0.01),
-                            border_mode='same')(x123456)    
+    x123456 = Convolution2D(n_filters_0, 1, 1,
+                            activation='relu',
+                            name="mix_channels_conv1D",
+                            border_mode='same')(x123456)
     
     x123456 = Normalization()(x123456)
     return x123456
@@ -325,7 +323,7 @@ def unet_two(n_classes, n_channels, input_width, input_height, deep=False, n_fil
     
     x = conv(x, n_filters_0=16, deep=False)
     
-    x = mix_channels(x, conv, n_filters_0=n_filters_0, deep=deep)
+    x = mix_channels(x, conv, n_filters_0=n_filters_0, deep=deep, l=0.0)
     
     x1, x2, x3, x4, x5 = unet_downsample(x, n_filters_0, deep)
     

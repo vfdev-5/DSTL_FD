@@ -177,3 +177,11 @@ def generate_label_image2(image_id):
         out[:,:,class_type] = one_class_mask
         out[:,:,0] = np.bitwise_xor(out[:,:,0], np.bitwise_and(out[:,:,0], one_class_mask)) # =x ^ (x & y)        
     return out
+
+
+def get_image_ids(classes, gb):
+    image_ids = set()
+    for c in classes:
+        ids = gb.get_group(c)['ImageId'].values.tolist()
+        image_ids.update(ids)
+    return list(image_ids)

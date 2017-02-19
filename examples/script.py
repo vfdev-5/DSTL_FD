@@ -20,7 +20,7 @@ import shapely.affinity
 from collections import defaultdict
 
 N_Cls = 10
-inDir = '/home/n01z3/dataset/dstl'
+inDir = '../input'
 DF = pd.read_csv(inDir + '/train_wkt_v4.csv')
 GS = pd.read_csv(inDir + '/grid_sizes.csv', names=['ImageId', 'Xmax', 'Ymin'], skiprows=1)
 SB = pd.read_csv(os.path.join(inDir, 'sample_submission.csv'))
