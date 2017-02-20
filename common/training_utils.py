@@ -7,7 +7,13 @@ from geo_utils.GeoImage import GeoImage
 from geo_utils.GeoImageTilers import GeoImageTilerConstSize
 
 
-def tile_iterator(image_ids_to_use, classes, presence_percentage=2, tile_size=(256, 256), return_tile_info=False):
+def tile_iterator(image_ids_to_use, classes,
+                  presence_percentage=2,
+                  tile_size=(256, 256),
+                  mean_image=None,
+                  std_image=None,
+                  random_rotation_angles=(-90.0, -60.0, -45.0, -30.0, 0.0, 30.0, 45.0, 60.0, 90.0),
+                  random_scales=(1.0, 1.25, 1.15)):
     """
     Method returns a random tile in which at least one class of `classes` is present more than `presence_percentage`
 
@@ -23,6 +29,8 @@ def tile_iterator(image_ids_to_use, classes, presence_percentage=2, tile_size=(2
     overlapping = int(min(tile_size[0], tile_size[1]) * 0.25)
 
     total_n_pixels = np.array([0] * len(classes))
+
+    apply_random_transformation = len(random_rotation_angles) > 0 or len(random_scales) > 0
 
     while True:
 
@@ -70,13 +78,35 @@ def tile_iterator(image_ids_to_use, classes, presence_percentage=2, tile_size=(2
                         gimg_17b = GeoImage(get_filename(ids[tiler_index], '17b'))
                         width = min(tile_size[0], gimg_17b.shape[1] - xoffset_label)
                         height = min(tile_size[1], gimg_17b.shape[0] - yoffset_label)
-                        tile_17b = gimg_17b.get_data([xoffset_label, yoffset_label, width, height])
+                        tile_17b = gimg_17b.get_data([xoffset_label, yoffset_label, width, height]).astype(np.float)
+
+                        mean_tile_image = mean_image[yoffset_label:yoffset_label + tile_size[1],
+                                          xoffset_label:xoffset_label + tile_size[0], :]
+                        std_tile_image = std_image[yoffset_label:yoffset_label + tile_size[1],
+                                         xoffset_label:xoffset_label + tile_size[0], :]
+
+                        tile_17b -= mean_tile_image
+                        tile_17b /= std_tile_image
+
+                        # Add random rotation and scale
+                        if False and apply_random_transformation:
+                            a = random_rotation_angles[np.random.randint(len(random_rotation_angles))]
+                            sc = random_scales[np.random.randint(len(random_scales))]
+                            warp_matrix = cv2.getRotationMatrix2D((tile_size[0] // 2, tile_size[1] // 2), a, sc)
+                            h, w, _ = tile_17b.shape
+                            tile_17b = cv2.warpAffine(tile_17b,
+                                                      warp_matrix,
+                                                      dsize=(w, h),
+                                                      flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+
+                            tile_label = cv2.warpAffine(tile_label,
+                                                      warp_matrix,
+                                                      dsize=(w, h),
+                                                      flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+
                         assert tile_label.shape[:2] == tile_17b.shape[:2], "Tile sizes are not equal: {} != {}".format \
                             (tile_label.shape[:2], tile_17b.shape[:2])
-                        if return_tile_info:
-                            yield tile_17b, tile_label, xoffset_label, yoffset_label, ids[tiler_index]
-                        else:
-                            yield tile_17b, tile_label
+                        yield tile_17b, tile_label
                         break
 
                 counter += 1

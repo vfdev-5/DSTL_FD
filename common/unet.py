@@ -2,27 +2,28 @@ import keras_conf
 
 
 from keras.layers import merge, Convolution2D, MaxPooling2D, Input, Permute
-from keras.layers import UpSampling2D, Reshape, Activation, BatchNormalization
+from keras.layers import UpSampling2D, Reshape, Activation
 from keras.models import Model
 from keras.regularizers import l2
 from keras import backend as K
 from keras.engine.topology import Layer
+from keras.constraints import nonneg
 
 
-def conv(input_layer, n_filters_0=16, deep=False, l=0.01):
+def conv(input_layer, n_filters_0=16, deep=False, l=0.01, size=3):
     """
     """
-    x = Convolution2D(n_filters_0, 3, 3,
+    x = Convolution2D(n_filters_0, size, size,
                       activation='relu',
                       #activation='elu',
-                      #init='he_normal',
+                      init='he_normal',
                       W_regularizer=l2(l),
                       border_mode='same')(input_layer)
     if deep:
-        x = Convolution2D(2 * n_filters_0, 3, 3,
+        x = Convolution2D(2 * n_filters_0, size, size,
                           activation='relu',
                           #activation='elu',
-                          #init='he_normal',
+                          init='he_normal',
                           W_regularizer=l2(l),
                           border_mode='same')(x)
     return x
@@ -88,6 +89,13 @@ def unet_base(input_layer, n_filters_0, deep):
     return x
 
 
+def original_termination(input_layer, n_classes, input_width, input_height):
+    """
+    U-net original termination
+    """
+    return Convolution2D(n_classes, 1, 1, activation='sigmoid')(input_layer)
+
+
 def simple_termination(input_layer, n_classes, input_width, input_height, activation_type='sigmoid'):
     """
     
@@ -107,7 +115,7 @@ def unet_zero(n_classes, n_channels, input_width, input_height, deep=False, n_fi
 
     inputs = Input((n_channels, input_height, input_width))
     x = unet_base(inputs, n_filters_0, deep)
-    outputs = simple_termination(x, n_classes, input_width, input_height, activation_type='softmax')
+    outputs = original_termination(x, n_classes, input_width, input_height)
     model = Model(input=inputs, output=outputs)
     return model
 
@@ -118,13 +126,8 @@ class Inverse(Layer):
         super(Inverse, self).__init__(**kwargs)
         
     def call(self, x, mask=None):
-        x = x + K.min(x) + 100.0
         eps = K.variable(value=K.epsilon())
         x = K.pow(x + eps, -1.0)
-        mean = K.mean(x)
-        std = K.std(x)
-        x -= mean
-        x /= std
         return x
 
     def get_output_shape_for(self, input_shape):
@@ -145,7 +148,7 @@ class Normalization(Layer):
 
     def get_output_shape_for(self, input_shape):
         return input_shape           
-        
+
 
 def conv2(input_layer, n_filters_0=16, l=0.01):
     """
@@ -173,7 +176,7 @@ def conv_downsample(input_layer, **kwargs):
     
 def merge_multiply(x1, x2):
     x12 = merge([x1, x2], mode='mul')
-    x12 = Normalization()(x12)   
+    # x12 = Normalization()(x12)
     return x12
 
     
@@ -336,5 +339,95 @@ def unet_two(n_classes, n_channels, input_width, input_height, deep=False, n_fil
     x = unet_upsample(x1, x2, x3, x4, x5, n_filters_0, deep)
     
     outputs = termination(x, n_classes, input_width, input_height, activation_type='softmax')    
+    model = Model(input=inputs, output=outputs)
+    return model
+
+
+def unet_ratios(n_classes, n_channels, input_width, input_height, deep=False, n_filters_0=8):
+    """
+    Architecture:
+
+    input -> [mix_channels: x + x*1/x + x*x + 1/x] -> [[conv]] -> [[U-net]] -> [termination]
+
+    """
+
+    inputs = Input((n_channels, input_height, input_width))
+    x = inputs
+
+    x = ratio(x, conv, n_filters_0=n_filters_0, deep=deep, l=0.0)
+
+    x = conv(x, n_filters_0=16, deep=False)
+
+    x1, x2, x3, x4, x5 = unet_downsample(x, n_filters_0, deep)
+
+    x1 = conv(x1, n_filters_0=16, deep=False)
+    x2 = conv(x2, n_filters_0=16, deep=False)
+    x3 = conv(x3, n_filters_0=16, deep=False)
+    x3 = conv(x3, n_filters_0=16, deep=False)
+    x4 = conv(x4, n_filters_0=16, deep=False)
+
+    x = unet_upsample(x1, x2, x3, x4, x5, n_filters_0, deep)
+
+    outputs = termination(x, n_classes, input_width, input_height, activation_type='softmax')
+    model = Model(input=inputs, output=outputs)
+    return model
+
+
+def unet_products(n_classes, n_channels, input_width, input_height, deep=False, n_filters_0=8):
+    """
+    Architecture:
+
+    input -> [mix_channels: x + x*1/x + x*x + 1/x] -> [[conv]] -> [[U-net]] -> [termination]
+
+    """
+
+    inputs = Input((n_channels, input_height, input_width))
+    x = inputs
+
+    x = product(x, conv, n_filters_0=n_filters_0, deep=deep, l=0.0)
+
+    x = conv(x, n_filters_0=16, deep=False)
+
+    x1, x2, x3, x4, x5 = unet_downsample(x, n_filters_0, deep)
+
+    x1 = conv(x1, n_filters_0=16, deep=False)
+    x2 = conv(x2, n_filters_0=16, deep=False)
+    x3 = conv(x3, n_filters_0=16, deep=False)
+    x3 = conv(x3, n_filters_0=16, deep=False)
+    x4 = conv(x4, n_filters_0=16, deep=False)
+
+    x = unet_upsample(x1, x2, x3, x4, x5, n_filters_0, deep)
+
+    outputs = termination(x, n_classes, input_width, input_height, activation_type='softmax')
+    model = Model(input=inputs, output=outputs)
+    return model
+
+
+def unet_three(n_classes, n_channels, input_width, input_height, deep=False, n_filters_0=8):
+    """
+    Architecture:
+
+    input -> [mix_channels: x + x*1/x + x*x + 1/x] -> [[conv]] -> [[U-net]] -> [termination]
+
+    """
+
+    inputs = Input((n_channels, input_height, input_width))
+    x = inputs
+
+    x = mix_channels(x, conv, n_filters_0=n_filters_0, deep=deep, l=0.0)
+
+    x = conv(x, n_filters_0=16, deep=False)
+
+    x1, x2, x3, x4, x5 = unet_downsample(x, n_filters_0, deep)
+
+    x1 = conv(x1, n_filters_0=16, deep=False)
+    x2 = conv(x2, n_filters_0=16, deep=False)
+    x3 = conv(x3, n_filters_0=16, deep=False)
+    x3 = conv(x3, n_filters_0=16, deep=False)
+    x4 = conv(x4, n_filters_0=16, deep=False)
+
+    x = unet_upsample(x1, x2, x3, x4, x5, n_filters_0, deep)
+
+    outputs = termination(x, n_classes, input_width, input_height, activation_type='softmax')
     model = Model(input=inputs, output=outputs)
     return model
