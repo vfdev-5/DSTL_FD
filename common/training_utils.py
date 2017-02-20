@@ -80,13 +80,13 @@ def tile_iterator(image_ids_to_use, classes,
                         height = min(tile_size[1], gimg_17b.shape[0] - yoffset_label)
                         tile_17b = gimg_17b.get_data([xoffset_label, yoffset_label, width, height]).astype(np.float)
 
-                        mean_tile_image = mean_image[yoffset_label:yoffset_label + tile_size[1],
-                                          xoffset_label:xoffset_label + tile_size[0], :]
-                        std_tile_image = std_image[yoffset_label:yoffset_label + tile_size[1],
-                                         xoffset_label:xoffset_label + tile_size[0], :]
-
-                        tile_17b -= mean_tile_image
-                        tile_17b /= std_tile_image
+                        if mean_image and std_image:
+                            mean_tile_image = mean_image[yoffset_label:yoffset_label + tile_size[1],
+                                              xoffset_label:xoffset_label + tile_size[0], :]
+                            std_tile_image = std_image[yoffset_label:yoffset_label + tile_size[1],
+                                             xoffset_label:xoffset_label + tile_size[0], :]
+                            tile_17b -= mean_tile_image
+                            tile_17b /= std_tile_image
 
                         # Add random rotation and scale
                         if False and apply_random_transformation:
