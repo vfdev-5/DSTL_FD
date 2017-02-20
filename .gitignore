@@ -9,6 +9,8 @@ results/*.csv
 *.solverstate
 *.h5
 
+common/otb_conf.yaml
+
 ## Linux backup files
 *~
 
