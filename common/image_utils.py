@@ -148,6 +148,20 @@ def get_filename(image_id, image_type):
     return os.path.join(data_path, "{}{}.{}".format(image_id, suffix, ext))
 
 
+def print_image_info(image_id, image_type):
+    
+    fname = get_filename(image_id, image_type)
+    img = gdal.Open(fname, gdalconst.GA_ReadOnly)
+    assert img, "Image file is not found: {}".format(fname)
+
+    print("Image size:", img.RasterYSize, img.RasterXSize, img.RasterCount)
+    print("Metadata:", img.GetMetadata_List())
+    print("MetadataDomainList:", img.GetMetadataDomainList())
+    print("Description:", img.GetDescription())
+    print("ProjectionRef:", img.GetProjectionRef())
+    print("GeoTransform:", img.GetGeoTransform())
+
+
 def get_image_tile_data(fname, return_shape_only=False):
     """
     Method to get image tile data as np.array
