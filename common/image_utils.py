@@ -14,6 +14,7 @@ DATA_3_BANDS='../input/three_band'
 DATA_16_BANDS='../input/sixteen_band'
 GENERATED_DATA = '../input/generated'
 TRAIN_DATA = '../input/train'
+TEST_DATA = '../input/test'
 
 
 GENERATED_LABELS = os.path.join(GENERATED_DATA, 'labels')
@@ -29,6 +30,9 @@ if not os.path.exists(GENERATED_LABELS):
 
 if not os.path.exists(TRAIN_DATA):
     os.makedirs(TRAIN_DATA)
+
+if not os.path.exists(TEST_DATA):
+    os.makedirs(TEST_DATA)
 
 # if not os.path.exists(TRAIN_LABEL_TILES):
 #     os.makedirs(TRAIN_LABEL_TILES)
@@ -141,6 +145,9 @@ def get_filename(image_id, image_type):
         suffix = ''
     elif image_type == '17b':
         data_path = TRAIN_DATA
+        suffix = ''
+    elif image_type == '17b_test':
+        data_path = TEST_DATA
         suffix = ''
     else:
         raise Exception("Image type '%s' is not recognized" % image_type)
