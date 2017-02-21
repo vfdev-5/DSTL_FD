@@ -86,26 +86,18 @@ class GeoImage:
         Initialize GeoImage
         :param filename: input image filename
         """
-        self._dataset = None
-        self.shape = None
-        self.geo_extent = None
-        self.metadata = None
-        self.gcps = None
-        self.gcp_projection = None
-        self._pix2geo = None
-
-        self._subsets = []
-
+        self.close()
         if len(filename) > 0:
             self.open(filename)
 
     def close(self):
         self._dataset = None
         self.shape = None
+        self.projection = ""
         self.geo_extent = None
         self.metadata = None
         self.gcps = None
-        self.gcp_projection = None
+        self.gcp_projection = ""
         self._pix2geo = None
         self._subsets = []
             
@@ -270,10 +262,10 @@ class GeoImage:
 
     def _setup_geo_transformers(self):
         assert self._dataset is not None, "Dataset is None"
-
         if self._pix2geo is not None:
             return False
 
+        self.projection = self._dataset.GetProjection()
         # Init pixel to geo transformer :
         srs = osgeo.osr.SpatialReference()
         srs.ImportFromEPSG(4326)
@@ -300,19 +292,19 @@ class GeoImage:
         pts = np.array([[0, 0], [w-1, 0], [w-1, h-1], [0, h-1]])
         return self.transform(pts, "pix2geo")
 
-    def get_data(self, src_rect=None, dst_width=None, dst_height=None, nodata_value=np.nan):
+    def get_data(self, src_rect=None, dst_width=None, dst_height=None, nodata_value=0, dtype=None):
         """
         Method to read data from image
-        srcRect is source extent in pixels : [x,y,w,h] where (x,y) is top-left corner. Can be None and whole image extent is used.
-        dst_width is the output array width. Can be None and srcRect[2] (width) is used.
-        dst_height is the output array heigth. Can be None and srcRect[3] (height) is used.
+        :param src_rect: is source extent in pixels : [x,y,w,h] where (x,y) is top-left corner. Can be None and whole image extent is used.
+        :param dst_width is the output array width. Can be None and src_rect[2] (width) is used.
+        :param dst_height is the output array heigth. Can be None and src_rect[3] (height) is used.
+        :param nodata_value: value to fill out of bounds pixels with.
+        :param dtype: force type of returned numpy array
         Returns a numpy array
         """
         assert self._dataset is not None, "Dataset is None"
-        assert self.shape[2] > 0, "Dataset has no bands"
+        assert self.shape[2] > 0, "Dataset has no bands" 
 
-        # src_req_extent = []
-        # src_extent = []
         if src_rect is None:
             src_req_extent = [0, 0, self.shape[1], self.shape[0]]
             src_extent = src_req_extent
@@ -323,8 +315,7 @@ class GeoImage:
         if src_req_extent is None:
             logging.warn('source request extent is None')
             return None
-
-        # dst_extent = []
+        
         if dst_width is None and dst_height is None:
             dst_extent = [src_extent[2], src_extent[3]]
         elif dst_height is None:
@@ -347,7 +338,11 @@ class GeoImage:
              reqScaledH]
 
         nbBands = self.shape[2]
-        datatype = gdal_to_numpy_datatype(self._dataset.GetRasterBand(1).DataType)
+        if dtype is None:
+            datatype = gdal_to_numpy_datatype(self._dataset.GetRasterBand(1).DataType)
+            datatype = update_dtype(datatype, nodata_value)
+        else:
+            datatype = dtype
 
         out = np.empty((dst_extent[1], dst_extent[0], nbBands), dtype=datatype)
         out.fill(nodata_value)
@@ -363,6 +358,7 @@ class GeoImage:
 
         return out
 
+    
     def get_filename(self):
         """
         Method to get image file name without path
@@ -417,6 +413,15 @@ def _assert_numpy_points(points):
     assert isinstance(points, np.ndarray), "Input should be a Numpy array"
     assert len(points.shape) == 2 and points.shape[1] == 2, \
         "Points should be a Numpy array of shape : (nbPts,2)"
+
+
+def update_dtype(dtype, v):
+    """
+    Update dtype to be conform with nodata_value
+    """
+    if isinstance(v, dtype):
+        return dtype
+    return type(v)
 
 
 def gdal_to_numpy_datatype(gdal_datatype):

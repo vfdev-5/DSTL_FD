@@ -119,6 +119,7 @@ def unet_zero(n_classes, n_channels, input_width, input_height, deep=False, n_fi
     model = Model(input=inputs, output=outputs)
     return model
 
+
 def unet_zero_prime(n_classes, n_channels, input_width, input_height, deep=False, n_filters_0=32):
 
     inputs = Input((n_channels, input_height, input_width))
@@ -130,6 +131,7 @@ def unet_zero_prime(n_classes, n_channels, input_width, input_height, deep=False
     outputs = original_termination(x, n_classes, input_width, input_height)
     model = Model(input=inputs, output=outputs)
     return model
+
 
 class Inverse(Layer):
     """Inverse Layer : 1/x """

@@ -12,8 +12,10 @@ def tile_iterator(image_ids_to_use, classes,
                   tile_size=(256, 256),
                   mean_image=None,
                   std_image=None,
-                  random_rotation_angles=(-90.0, -60.0, -45.0, -30.0, 0.0, 30.0, 45.0, 60.0, 90.0),
-                  random_scales=(1.0, 1.25, 1.15)):
+                  random_rotation_angles=(0.0, 5.0, 0.0, -5.0, 0.0, 15.0, 0.0, -15.0),
+                  random_scales=(),
+                  random_resolution_levels=(1, 2, 3, 4)
+                ):
     """
     Method returns a random tile in which at least one class of `classes` is present more than `presence_percentage`
 
@@ -31,6 +33,7 @@ def tile_iterator(image_ids_to_use, classes,
     total_n_pixels = np.array([0] * len(classes))
 
     apply_random_transformation = len(random_rotation_angles) > 0 or len(random_scales) > 0
+    apply_random_resolutions = len(random_resolution_levels) > 0
 
     while True:
 
@@ -45,8 +48,13 @@ def tile_iterator(image_ids_to_use, classes,
             # Open 5 labels images
             gimg_tilers = []
             for image_id in ids:
+                size = tile_size
+                if apply_random_resolutions:
+                    f = random_resolution_levels[np.random.randint(len(random_resolution_levels))]
+                    size[0] *= f
+                    size[1] *= f                
                 gimg_label = GeoImage(get_filename(image_id, 'label'))
-                gimg_label_tiles = GeoImageTilerConstSize(gimg_label, tile_size=tile_size, min_overlapping=overlapping)
+                gimg_label_tiles = GeoImageTilerConstSize(gimg_label, tile_size=size, min_overlapping=overlapping)
                 gimg_tilers.append(gimg_label_tiles)
 
             counter = 0
@@ -59,7 +67,7 @@ def tile_iterator(image_ids_to_use, classes,
                         all_done = False
                         tile_label, xoffset_label, yoffset_label = tile_info_label
                         h, w, _ = tile_label.shape
-                        class_freq = np.array([0 ] *len(classes))
+                        class_freq = np.array([0] *len(classes))
                         for ci, cindex in enumerate(classes):
                             class_freq[ci] += cv2.countNonZero(tile_label[:, :, cindex])
                         # If class representatifs are less than presence_percentage in the tile -> discard the tile
@@ -75,26 +83,28 @@ def tile_iterator(image_ids_to_use, classes,
 
                         tile_label = tile_label[:, :, classes]
 
-                        gimg_17b = GeoImage(get_filename(ids[tiler_index], '17b'))
-                        width = min(tile_size[0], gimg_17b.shape[1] - xoffset_label)
-                        height = min(tile_size[1], gimg_17b.shape[0] - yoffset_label)
-                        tile_17b = gimg_17b.get_data([xoffset_label, yoffset_label, width, height]).astype(np.float)
+                        gimg_input = GeoImage(get_filename(ids[tiler_index], 'input'))
+                        width = min(tile_size[0], gimg_input.shape[1] - xoffset_label)
+                        height = min(tile_size[1], gimg_input.shape[0] - yoffset_label)
+                        tile_input = gimg_input.get_data([xoffset_label, yoffset_label, width, height]).astype(np.float)
 
-                        if mean_image and std_image:
+                        if mean_image is not None and std_image is not None:
                             mean_tile_image = mean_image[yoffset_label:yoffset_label + tile_size[1],
                                               xoffset_label:xoffset_label + tile_size[0], :]
                             std_tile_image = std_image[yoffset_label:yoffset_label + tile_size[1],
                                              xoffset_label:xoffset_label + tile_size[0], :]
-                            tile_17b -= mean_tile_image
-                            tile_17b /= std_tile_image
+                            tile_input -= mean_tile_image
+                            tile_input /= std_tile_image
 
                         # Add random rotation and scale
-                        if False and apply_random_transformation:
-                            a = random_rotation_angles[np.random.randint(len(random_rotation_angles))]
-                            sc = random_scales[np.random.randint(len(random_scales))]
+                        if apply_random_transformation:
+                            sc = random_scales[np.random.randint(len(random_scales))] if len(random_scales) > 0 else 1.0
+                            a = random_rotation_angles[np.random.randint(len(random_rotation_angles))] if len(random_rotation_angles) > 0 else 0.0
+                            if a != 0 and sc < 1.15:
+                                sc = 1.15
                             warp_matrix = cv2.getRotationMatrix2D((tile_size[0] // 2, tile_size[1] // 2), a, sc)
-                            h, w, _ = tile_17b.shape
-                            tile_17b = cv2.warpAffine(tile_17b,
+                            h, w, _ = tile_input.shape
+                            tile_input = cv2.warpAffine(tile_input,
                                                       warp_matrix,
                                                       dsize=(w, h),
                                                       flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
@@ -104,9 +114,9 @@ def tile_iterator(image_ids_to_use, classes,
                                                       dsize=(w, h),
                                                       flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
 
-                        assert tile_label.shape[:2] == tile_17b.shape[:2], "Tile sizes are not equal: {} != {}".format \
-                            (tile_label.shape[:2], tile_17b.shape[:2])
-                        yield tile_17b, tile_label
+                        assert tile_label.shape[:2] == tile_input.shape[:2], "Tile sizes are not equal: {} != {}".format \
+                            (tile_label.shape[:2], tile_input.shape[:2])
+                        yield tile_input, tile_label
                         break
 
                 counter += 1

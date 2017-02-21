@@ -9,37 +9,8 @@ import gdal
 import gdalconst
 from gdal_pansharpen import gdal_pansharpen
 
-
-DATA_3_BANDS='../input/three_band'
-DATA_16_BANDS='../input/sixteen_band'
-GENERATED_DATA = '../input/generated'
-TRAIN_DATA = '../input/train'
-TEST_DATA = '../input/test'
-
-
-GENERATED_LABELS = os.path.join(GENERATED_DATA, 'labels')
-TRAIN_LABEL_TILES = os.path.join(TRAIN_DATA, 'labels')
-TRAIN_LABEL_TILES_1D = os.path.join(TRAIN_DATA, 'labels_1d')
-
-
-if not os.path.exists(GENERATED_DATA):
-    os.makedirs(GENERATED_DATA)
-
-if not os.path.exists(GENERATED_LABELS):
-    os.makedirs(GENERATED_LABELS)
-
-if not os.path.exists(TRAIN_DATA):
-    os.makedirs(TRAIN_DATA)
-
-if not os.path.exists(TEST_DATA):
-    os.makedirs(TEST_DATA)
-
-# if not os.path.exists(TRAIN_LABEL_TILES):
-#     os.makedirs(TRAIN_LABEL_TILES)
-#
-# if not os.path.exists(TRAIN_LABEL_TILES_1D):
-#     os.makedirs(TRAIN_LABEL_TILES_1D)
-
+from data_utils import get_filename, get_resized_polygons
+from data_utils import TRAIN_DATA, ORDERED_LABEL_IDS
 
 def generate_aligned_swir(image_id):
     """
@@ -93,66 +64,6 @@ def generate_pansharpened(image_id, image_type):
     fname = get_filename(image_id, image_type)
     fname_pan = get_filename(image_id, 'pan')
     gdal_pansharpen(['', fname_pan, fname, outfname])  
-
-
-def get_tile_filename(image_id, xoffset, yoffset, image_type):
-    if image_type == '17b':
-        dir_path = TRAIN_DATA
-        ext = 'tif'
-    elif image_type == 'label':
-        dir_path = TRAIN_LABEL_TILES
-        ext = 'tif'
-    elif image_type == 'label_1d':
-        dir_path = TRAIN_LABEL_TILES_1D
-        ext = 'tif'
-    else:
-        raise Exception("Unknown image type: {}".format(image_type))
-    return os.path.join(dir_path, "{}_{}_{}.{}".format(image_id, xoffset, yoffset, ext))
-
-    
-def get_filename(image_id, image_type):
-    """
-    Method to get image file path from its id and type   
-    """
-    ext = 'tif'
-    if image_type == '3b':
-        data_path = DATA_3_BANDS
-        suffix = ''
-    elif image_type == 'pan':
-        data_path = DATA_16_BANDS
-        suffix = '_P'
-    elif image_type == 'ms':
-        data_path = DATA_16_BANDS
-        suffix = '_M'
-    elif image_type == 'swir':
-        data_path = DATA_16_BANDS
-        suffix = '_A'
-    elif image_type == 'swir_aligned':
-        data_path = GENERATED_DATA
-        suffix = '_A_aligned'
-    elif image_type == 'ms_pan':
-        data_path = GENERATED_DATA
-        suffix = '_M_P'
-    elif image_type == 'swir_upsampled' or \
-            image_type == 'swir_aligned_upsampled':
-        data_path = GENERATED_DATA
-        suffix = '_A_P'
-    elif image_type == 'label_1d':
-        data_path = GENERATED_LABELS
-        suffix = '_1d'
-    elif image_type == 'label':
-        data_path = GENERATED_LABELS
-        suffix = ''
-    elif image_type == '17b':
-        data_path = TRAIN_DATA
-        suffix = ''
-    elif image_type == '17b_test':
-        data_path = TEST_DATA
-        suffix = ''
-    else:
-        raise Exception("Image type '%s' is not recognized" % image_type)
-        
-    return os.path.join(data_path, "{}{}.{}".format(image_id, suffix, ext))
 
 
 def print_image_info(image_id, image_type):
@@ -501,26 +412,26 @@ def compute_mean_std_on_tiles(trainset_ids):
     return mean_tile_image, std_tile_image
 
 
-def compute_mean_std_on_images(trainset_ids):
+def compute_mean_std_on_images(trainset_ids, image_type='5b'):
     """
     Method to compute mean/std input image
     :return: mean_image, std_image
     """
     ll = len(trainset_ids)
     image_id = trainset_ids[0]
-    img_17b = get_image_data(image_id, '17b').astype(np.float)
+    img_Kb = get_image_data(image_id, image_type).astype(np.float)
     # Init mean/std images
-    mean_image = np.zeros((3349, 3404, 17))
-    h, w, _ = img_17b.shape
-    mean_image[:h, :w, :] += img_17b
+    mean_image = np.zeros((3349, 3404, img_Kb.shape[2]))
+    h, w, _ = img_Kb.shape
+    mean_image[:h, :w, :] += img_Kb
     std_image = np.power(mean_image, 2)
 
     for i, image_id in enumerate(trainset_ids[1:]):
         logging.info("-- %i/%i | %s" % (i + 2, ll, image_id))
-        img_17b = get_image_data(image_id, '17b').astype(np.float)
-        h, w, _ = img_17b.shape
-        mean_image[:h, :w, :] += img_17b
-        std_image[:h, :w, :] += np.power(img_17b, 2)
+        img_Kb = get_image_data(image_id, image_type).astype(np.float)
+        h, w, _ = img_Kb.shape
+        mean_image[:h, :w, :] += img_Kb
+        std_image[:h, :w, :] += np.power(img_Kb, 2)
 
     mean_image *= 1.0 / ll
     std_image *= 1.0 / ll
@@ -528,3 +439,63 @@ def compute_mean_std_on_images(trainset_ids):
     std_image = np.sqrt(std_image)
     return mean_image, std_image
 
+
+def generate_label_file(image_id, multi_dim=True):
+    if multi_dim:
+        outfname = get_filename(image_id, 'label')
+        if os.path.exists(outfname):
+            logging.warn("File '%s' is already existing" % outfname)
+            return
+        image_data = generate_label_image2(image_id)
+        imwrite(outfname, image_data)
+    else:
+        outfname = get_filename(image_id, 'label_1d')
+        if os.path.exists(outfname):
+            logging.warn("File '%s' is already existing" % outfname)
+            return
+        image_data = generate_label_image(image_id)
+        cv2.imwrite(outfname, image_data)
+
+
+def generate_label_image(image_id):
+
+    image_shape = get_image_data(image_id, 'pan', return_shape_only=True)   
+    rpolygons = get_resized_polygons(image_id, *image_shape[:2])
+    out_size = get_image_data(image_id, 'pan', return_shape_only=True)
+    out = np.zeros(out_size[:2], np.uint8)
+    round_coords = lambda x: np.array(x).round().astype(np.int32)    
+    for i, class_type in enumerate(ORDERED_LABEL_IDS):
+        if class_type not in rpolygons:
+            continue
+        one_class_mask = np.zeros(out_size[:2], np.uint8)
+        for polygon in rpolygons[class_type]:
+            exterior = [round_coords(polygon.exterior.coords)]
+            cv2.fillPoly(one_class_mask, exterior, i)
+            if len(polygon.interiors) > 0:
+                interiors = [round_coords(poly.coords) for poly in polygon.interiors]
+                cv2.fillPoly(one_class_mask, interiors, 0)
+        out = np.maximum(out, one_class_mask)
+    return out
+
+
+def generate_label_image2(image_id):
+    
+    image_shape = get_image_data(image_id, 'pan', return_shape_only=True)   
+    rpolygons = get_resized_polygons(image_id, *image_shape[:2])
+    out_size = get_image_data(image_id, 'pan', return_shape_only=True)
+    out = np.zeros(out_size[:2] + (len(LABELS), ), np.uint8)
+    out[:,:,0] = 1
+    round_coords = lambda x: np.array(x).round().astype(np.int32)
+    for class_type in range(1, len(LABELS)):
+        if class_type not in rpolygons:
+            continue
+        one_class_mask = np.zeros(out_size[:2], np.uint8)
+        for polygon in rpolygons[class_type]:
+            exterior = [round_coords(polygon.exterior.coords)]
+            cv2.fillPoly(one_class_mask, exterior, 1)
+            if len(polygon.interiors) > 0:
+                interiors = [round_coords(poly.coords) for poly in polygon.interiors]
+                cv2.fillPoly(one_class_mask, interiors, 0)
+        out[:,:,class_type] = one_class_mask
+        out[:,:,0] = np.bitwise_xor(out[:,:,0], np.bitwise_and(out[:,:,0], one_class_mask)) # =x ^ (x & y)        
+    return out

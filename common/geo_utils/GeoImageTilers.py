@@ -18,16 +18,25 @@ class BaseGeoImageTiler(object):
     See the implementations
         - GeoImageTiler
         - GeoImageTilerConstSize
+
+    Essential parameters:
+    :param geo_image: instance of GeoImage
+    :param tile_size: output tile size in pixels
+    :param scale: tile resolution scale, default 1.0, corresponds to a scaling 
+        between requested ROI from the image and returned tile.
+        For example, when scale=2.0 returned tiles represent two times larger zone in pixels than the same zone in the image, e.g
+        source image rectangle `[x, y, scale*tile_size_x, scale*tile_size_x]` is sampled to a tile of size `tile_size`        
     """
-    def __init__(self, geo_image, tile_size=(1024, 1024)):
+    def __init__(self, geo_image, tile_size=(1024, 1024), scale=1.0):
         assert isinstance(geo_image, GeoImage), logger.error("geo_image argument should be instance of GeoImage")
         assert len(tile_size) == 2, logger.error("tile_size argument should be a tuple (sx, sy)")
 
         self._geo_image = geo_image
         self.tile_size = tile_size
+        self.scale = scale
         self._index = 0
         self._maxIndex = 0
-        self.nodata_value = np.nan
+        self.nodata_value = 0
 
     def __iter__(self):
         return self
@@ -38,10 +47,12 @@ class BaseGeoImageTiler(object):
     def compute_geo_extent(self, tile_offset, tile_size):
         """
         Compute tile geo extent
-        :param tile_offset: [x, y] tile offset
+        :param tile_offset: [x, y] tile offset (top-left coordinates) in the original image
         :param tile_size: [width, height] of the tile
         """
         x, y = tile_offset
+        tile_size[0] *= self.scale
+        tile_size[1] *= self.scale
         points = np.array([[x, y],
                            [x + tile_size[0] - 1, y],
                            [x + tile_size[0] - 1, y + tile_size[1] - 1],
@@ -60,15 +71,16 @@ class BaseGeoImageTiler(object):
 
         # Define ROI to extract
         extent, x_tile_index, y_tile_index = self._get_current_tile_extent()
-        logger.debug("{} = ({},{}) | extent={}".format(self._index, x_tile_index, y_tile_index, extent))
-
+        scaled_extent = [int(np.ceil(i * self.scale)) for i in extent]
+        logger.debug("{} = ({},{}) | extent={}".format(self._index, x_tile_index, y_tile_index, scaled_extent))
+        
         # Extract data
-        data = self._geo_image.get_data(extent, nodata_value=self.nodata_value)
+        data = self._geo_image.get_data(scaled_extent, *extent[2:], nodata_value=self.nodata_value)
 
         # ++
         self._index += 1
 
-        return data, extent[0], extent[1]
+        return data, scaled_extent[0], scaled_extent[1]
 
     __next__ = next
 
@@ -186,18 +198,19 @@ class GeoImageTiler(BaseGeoImageTiler):
             *************---|
             |___________|___|
 
-
-
     """
-    def __init__(self, geo_image, tile_size=(1024, 1024), overlapping=256, include_nodata=False, nodata_value=np.nan):
+    def __init__(self, geo_image, tile_size=(1024, 1024), overlapping=256, 
+                    include_nodata=False, nodata_value=0, scale=1.0):
 
-        super(GeoImageTiler, self).__init__(geo_image, tile_size)
-        assert overlapping > 0 and 2*overlapping < min(tile_size[0], tile_size[1]), \
+        super(GeoImageTiler, self).__init__(geo_image, tile_size, scale)
+        assert overlapping >= 0 and 2*overlapping < min(tile_size[0], tile_size[1]), \
             logger.error("overlapping argument should be less than half of the min of tile_size")
 
         self.overlapping = overlapping
-        self.nx = GeoImageTiler._compute_number_of_tiles(self.tile_size[0], self._geo_image.shape[1], overlapping)
-        self.ny = GeoImageTiler._compute_number_of_tiles(self.tile_size[1], self._geo_image.shape[0], overlapping)
+        h = self._geo_image.shape[1] * 1.0 / self.scale
+        w = self._geo_image.shape[0] * 1.0 / self.scale
+        self.nx = GeoImageTiler._compute_number_of_tiles(self.tile_size[0], w, overlapping)
+        self.ny = GeoImageTiler._compute_number_of_tiles(self.tile_size[1], h, overlapping)
         self._maxIndex = self.nx * self.ny
         self.include_nodata = include_nodata
         self.nodata_value = nodata_value
@@ -245,13 +258,13 @@ class GeoImageTiler(BaseGeoImageTiler):
         bufferOffset(i) = {i == 0: dataPtr + overlapping
                           {i > 0: dataPtr + 0
         """
-        image_width = self._geo_image.shape[1]
-        image_height = self._geo_image.shape[0]
+        image_width = int(np.ceil(self._geo_image.shape[1] * 1.0 / self.scale))
+        image_height = int(np.ceil(self._geo_image.shape[0] * 1.0 / self.scale))
         x_tile_index = self._index % self.nx
         y_tile_index = int(np.floor(self._index * 1.0 / self.nx))
 
-        x_tile_size = self.tile_size[0]
-        y_tile_size = self.tile_size[1]
+        x_tile_size = self.tile_size[0] 
+        y_tile_size = self.tile_size[1] 
         x_tile_offset = x_tile_index * (self.tile_size[0] - self.overlapping) - self.overlapping
         y_tile_offset = y_tile_index * (self.tile_size[1] - self.overlapping) - self.overlapping
 
@@ -262,8 +275,8 @@ class GeoImageTiler(BaseGeoImageTiler):
             if y_tile_index == 0:
                 y_tile_offset = 0
                 y_tile_size -= self.overlapping
-            x_tile_size = image_width - x_tile_offset if x_tile_offset + x_tile_size >= image_width else x_tile_size
-            y_tile_size = image_height - y_tile_offset if y_tile_offset + y_tile_size >= image_height else y_tile_size
+            x_tile_size = min(image_width - x_tile_offset, x_tile_size)
+            y_tile_size = min(image_height - y_tile_offset, y_tile_size)
 
         return [x_tile_offset, y_tile_offset, x_tile_size, y_tile_size], x_tile_index, y_tile_index
 

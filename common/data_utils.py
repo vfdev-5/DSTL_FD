@@ -3,26 +3,43 @@ import logging
 import numpy as np
 import pandas as pd
 
-# Opencv
-import cv2
-
 from shapely.wkt import loads
 from shapely.affinity import scale
 
-from image_utils import get_image_data, get_filename, imwrite
 
 assert os.path.exists('../input'), "Please download Kaggle input data into 'input' folder"
 
 GRID_SIZE = pd.read_csv('../input/grid_sizes.csv',
                         names=['ImageId', 'Xmax', 'Ymin'],
                         skiprows=1)
-GRID_SIZE.columns = ['ImageId','Xmax','Ymin']
+GRID_SIZE.columns = ['ImageId', 'Xmax', 'Ymin']
 TRAIN_WKT = pd.read_csv('../input/train_wkt_v4.csv',
                         dtype={'ClassType':int})
 
 TRAIN_IMAGE_IDS = TRAIN_WKT['ImageId'].unique()
 ALL_IMAGE_IDS = GRID_SIZE['ImageId'].unique()
 
+DATA_3_BANDS = os.path.join('..', 'input', 'three_band')
+DATA_16_BANDS = os.path.join('..', 'input', 'sixteen_band')
+GENERATED_DATA = os.path.join('..', 'input', 'generated')
+TRAIN_DATA = os.path.join('..', 'input', 'train')
+TEST_DATA = os.path.join('..', 'input', 'test')
+
+GENERATED_LABELS = os.path.join(GENERATED_DATA, 'labels')
+TRAIN_LABEL_TILES = os.path.join(TRAIN_DATA, 'labels')
+TRAIN_LABEL_TILES_1D = os.path.join(TRAIN_DATA, 'labels_1d')
+
+if not os.path.exists(GENERATED_DATA):
+    os.makedirs(GENERATED_DATA)
+
+if not os.path.exists(GENERATED_LABELS):
+    os.makedirs(GENERATED_LABELS)
+
+if not os.path.exists(TRAIN_DATA):
+    os.makedirs(TRAIN_DATA)
+
+if not os.path.exists(TEST_DATA):
+    os.makedirs(TEST_DATA)
 
 LABELS = [
     "None",
@@ -87,6 +104,69 @@ FULL_LABELS = [
 ]
 
 
+def get_tile_filename(image_id, xoffset, yoffset, image_type):
+    if image_type == '17b':
+        dir_path = TRAIN_DATA
+        ext = 'tif'
+    elif image_type == 'label':
+        dir_path = TRAIN_LABEL_TILES
+        ext = 'tif'
+    elif image_type == 'label_1d':
+        dir_path = TRAIN_LABEL_TILES_1D
+        ext = 'tif'
+    else:
+        raise Exception("Unknown image type: {}".format(image_type))
+    return os.path.join(dir_path, "{}_{}_{}.{}".format(image_id, xoffset, yoffset, ext))
+
+    
+def get_filename(image_id, image_type):
+    """
+    Method to get image file path from its id and type   
+    """
+    ext = 'tif'
+    if image_type == '3b':
+        data_path = DATA_3_BANDS
+        suffix = ''
+    elif image_type == 'pan':
+        data_path = DATA_16_BANDS
+        suffix = '_P'
+    elif image_type == 'ms':
+        data_path = DATA_16_BANDS
+        suffix = '_M'
+    elif image_type == 'swir':
+        data_path = DATA_16_BANDS
+        suffix = '_A'
+    elif image_type == 'swir_aligned':
+        data_path = GENERATED_DATA
+        suffix = '_A_aligned'
+    elif image_type == 'ms_pan':
+        data_path = GENERATED_DATA
+        suffix = '_M_P'
+    elif image_type == 'swir_upsampled' or \
+            image_type == 'swir_aligned_upsampled':
+        data_path = GENERATED_DATA
+        suffix = '_A_P'
+    elif image_type == 'label_1d':
+        data_path = GENERATED_LABELS
+        suffix = '_1d'
+    elif image_type == 'label':
+        data_path = GENERATED_LABELS
+        suffix = ''
+    elif image_type == '17b':
+        data_path = GENERATED_DATA
+        suffix = ''
+    elif image_type == 'multi':
+        data_path = GENERATED_DATA
+        suffix = '_multi'
+    elif image_type == 'input':
+        data_path = TRAIN_DATA if image_id in TRAIN_IMAGE_IDS else TEST_DATA
+        suffix = ''
+    else:
+        raise Exception("Image type '%s' is not recognized" % image_type)
+        
+    return os.path.join(data_path, "{}{}.{}".format(image_id, suffix, ext))
+
+
 def get_unit_polygons(image_id):
     polygons = {}
     image_polygons = TRAIN_WKT[TRAIN_WKT['ImageId'] == image_id]
@@ -102,18 +182,17 @@ def get_grid_params(image_id):
     return params.values[0]
 
 
-def get_scalers(image_id, image_type):
+def get_scalers(image_id, image_height, image_width):
     x_max, y_min = get_grid_params(image_id)
-    image_shape = get_image_data(image_id, image_type, return_shape_only=True)   
-    h, w = image_shape[:2]  # they are flipped so that mask_for_polygons works correctly
+    h, w = image_height, image_width
     w_ = w * (w * 1.0 / (w + 1.0))
     h_ = h * (h * 1.0 / (h + 1.0))
     return w_ / x_max, h_ / y_min
 
 
-def get_resized_polygons(image_id, image_type):
+def get_resized_polygons(image_id, image_height, image_width):
     polygons = get_unit_polygons(image_id)
-    x_scaler, y_scaler = get_scalers(image_id, image_type)
+    x_scaler, y_scaler = get_scalers(image_id, image_height, image_width)
     resized_polygons = {}
     for class_type in polygons:
         poly = polygons[class_type]
@@ -121,64 +200,7 @@ def get_resized_polygons(image_id, image_type):
         resized_polygons[class_type] = rpoly
     return resized_polygons
     
-
-def generate_label_file(image_id, multi_dim=True):
-    if multi_dim:
-        outfname = get_filename(image_id, 'label')
-        if os.path.exists(outfname):
-            logging.warn("File '%s' is already existing" % outfname)
-            return
-        image_data = generate_label_image2(image_id)
-        imwrite(outfname, image_data)
-    else:
-        outfname = get_filename(image_id, 'label_1d')
-        if os.path.exists(outfname):
-            logging.warn("File '%s' is already existing" % outfname)
-            return
-        image_data = generate_label_image(image_id)
-        cv2.imwrite(outfname, image_data)
-
-    
-def generate_label_image(image_id):
-    rpolygons = get_resized_polygons(image_id, 'pan')
-    out_size = get_image_data(image_id, 'pan', return_shape_only=True)
-    out = np.zeros(out_size[:2], np.uint8)
-    round_coords = lambda x: np.array(x).round().astype(np.int32)    
-    for i, class_type in enumerate(ORDERED_LABEL_IDS):
-        if class_type not in rpolygons:
-            continue
-        one_class_mask = np.zeros(out_size[:2], np.uint8)
-        for polygon in rpolygons[class_type]:
-            exterior = [round_coords(polygon.exterior.coords)]
-            cv2.fillPoly(one_class_mask, exterior, i)
-            if len(polygon.interiors) > 0:
-                interiors = [round_coords(poly.coords) for poly in polygon.interiors]
-                cv2.fillPoly(one_class_mask, interiors, 0)
-        out = np.maximum(out, one_class_mask)
-    return out
-
-
-def generate_label_image2(image_id):
-    rpolygons = get_resized_polygons(image_id, 'pan')
-    out_size = get_image_data(image_id, 'pan', return_shape_only=True)
-    out = np.zeros(out_size[:2] + (len(LABELS), ), np.uint8)
-    out[:,:,0] = 1
-    round_coords = lambda x: np.array(x).round().astype(np.int32)
-    for class_type in range(1, len(LABELS)):
-        if class_type not in rpolygons:
-            continue
-        one_class_mask = np.zeros(out_size[:2], np.uint8)
-        for polygon in rpolygons[class_type]:
-            exterior = [round_coords(polygon.exterior.coords)]
-            cv2.fillPoly(one_class_mask, exterior, 1)
-            if len(polygon.interiors) > 0:
-                interiors = [round_coords(poly.coords) for poly in polygon.interiors]
-                cv2.fillPoly(one_class_mask, interiors, 0)
-        out[:,:,class_type] = one_class_mask
-        out[:,:,0] = np.bitwise_xor(out[:,:,0], np.bitwise_and(out[:,:,0], one_class_mask)) # =x ^ (x & y)        
-    return out
-
-
+  
 def get_image_ids(classes, gb):
     image_ids = set()
     for c in classes:
