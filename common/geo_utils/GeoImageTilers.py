@@ -72,7 +72,7 @@ class BaseGeoImageTiler(object):
         # Define ROI to extract
         extent, x_tile_index, y_tile_index = self._get_current_tile_extent()
         # extent = [xoffset, yoffset, tile_size_x, tile_size_y]
-        scaled_extent = [e * self.scale for e in extent]
+        scaled_extent = [floor_int(e * self.scale) for e in extent]
         logger.debug("{}/{} = ({},{}) | extent={}".format(self._index, self._maxIndex, x_tile_index, y_tile_index, scaled_extent))
         
         # Extract data
