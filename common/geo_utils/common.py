@@ -20,7 +20,7 @@ def get_basename(filepath):
     return '.'.join(splt[:-1]) if len(splt) > 1 else splt[0]
 
 
-def get_dtype(depth, is_complex):
+def get_dtype(depth, is_complex, signed=True):
     """
     Method to convert the pair (depth={1,2,4,8}, is_complex={True,False})
     into numpy dtype
@@ -31,7 +31,7 @@ def get_dtype(depth, is_complex):
     if depth == 1 and not is_complex:
         return np.uint8
     elif depth == 2 and not is_complex:
-        return np.uint16
+        return np.uint16 if signed else np.int16
     elif depth == 4 and not is_complex:
         return np.float32
     elif depth == 8 and not is_complex:
@@ -44,7 +44,7 @@ def get_dtype(depth, is_complex):
         raise AssertionError("Data type is not recognized")
 
 
-def get_gdal_dtype(depth, is_complex):
+def get_gdal_dtype(depth, is_complex, signed=True):
     """
     Method to convert the pair (depth={1,2,4,8}, is_complex={True,False})
     If is_complex == True, depth corresponds real and imaginary parts
@@ -57,7 +57,7 @@ def get_gdal_dtype(depth, is_complex):
     if depth == 1 and not is_complex:
         return gdal.GDT_Byte
     elif depth == 2 and not is_complex:
-        return gdal.GDT_UInt16
+        return gdal.GDT_UInt16 if signed else gdal.GDT_Int16
     elif depth == 4 and not is_complex:
         return gdal.GDT_Float32
     elif depth == 8 and not is_complex:
@@ -68,3 +68,37 @@ def get_gdal_dtype(depth, is_complex):
         return gdal.GDT_CFloat64
     else:
         raise AssertionError("Data type is not recognized")
+
+
+def gdal_to_numpy_datatype(gdal_datatype):
+    """
+    Method to convert gdal data type to numpy dtype
+    >>> gdal_to_numpy_datatype(gdal.GDT_Float32) == np.float32
+    True
+    """
+    if gdal_datatype == gdal.GDT_Byte:
+        return np.uint8
+    elif gdal_datatype == gdal.GDT_Int16:
+        return np.int16
+    elif gdal_datatype == gdal.GDT_Int32:
+        return np.int32
+    elif gdal_datatype == gdal.GDT_UInt16:
+        return np.uint16
+    elif gdal_datatype == gdal.GDT_UInt32:
+        return np.uint32
+    elif gdal_datatype == gdal.GDT_Float32:
+        return np.float32
+    elif gdal_datatype == gdal.GDT_Float64:
+        return np.float64
+    elif gdal_datatype == gdal.GDT_CInt16:
+        # No associated type -> cast to complex64
+        return np.complex64
+    elif gdal_datatype == gdal.GDT_CInt32:
+        # No associated type -> cast to complex64
+        return np.complex64
+    elif gdal_datatype == gdal.GDT_CFloat32:
+        return np.complex64
+    elif gdal_datatype == gdal.GDT_CFloat64:
+        return np.complex128
+    else:
+        raise AssertionError("Data type '%i' is not recognized" % gdal_datatype)

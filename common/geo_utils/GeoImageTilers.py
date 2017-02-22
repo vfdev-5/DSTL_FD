@@ -71,12 +71,19 @@ class BaseGeoImageTiler(object):
 
         # Define ROI to extract
         extent, x_tile_index, y_tile_index = self._get_current_tile_extent()
-        scaled_extent = [int(np.ceil(i * self.scale)) for i in extent]
-        logger.debug("{} = ({},{}) | extent={}".format(self._index, x_tile_index, y_tile_index, scaled_extent))
+        # extent = [xoffset, yoffset, tile_size_x, tile_size_y]
+        scaled_extent = [e * self.scale for e in extent]
+        logger.debug("{}/{} = ({},{}) | extent={}".format(self._index, self._maxIndex, x_tile_index, y_tile_index, scaled_extent))
         
         # Extract data
-        data = self._geo_image.get_data(scaled_extent, *extent[2:], nodata_value=self.nodata_value)
-
+        dst_width = ceil_int(extent[2])  # ceil need when tile size is computed (image_size/scale - offset)
+        dst_height = ceil_int(extent[3])
+        logger.debug("dst_width={}, dst_height={}".format(dst_width, dst_height))
+        data = self._geo_image.get_data(scaled_extent,
+                                        dst_width=dst_width,
+                                        dst_height=dst_height,
+                                        nodata_value=self.nodata_value)
+        logger.debug("data.shape={}, {},{}".format(data.shape, extent[0], extent[1]))
         # ++
         self._index += 1
 
@@ -207,8 +214,8 @@ class GeoImageTiler(BaseGeoImageTiler):
             logger.error("overlapping argument should be less than half of the min of tile_size")
 
         self.overlapping = overlapping
-        h = self._geo_image.shape[1] * 1.0 / self.scale
-        w = self._geo_image.shape[0] * 1.0 / self.scale
+        h = self._geo_image.shape[0] * 1.0 / self.scale
+        w = self._geo_image.shape[1] * 1.0 / self.scale
         self.nx = GeoImageTiler._compute_number_of_tiles(self.tile_size[0], w, overlapping)
         self.ny = GeoImageTiler._compute_number_of_tiles(self.tile_size[1], h, overlapping)
         self._maxIndex = self.nx * self.ny
@@ -234,7 +241,7 @@ class GeoImageTiler(BaseGeoImageTiler):
                    3  :               [34xxxxx]
               n = ceil ( (16+2) / (7 - 2) ) = 4
         """
-        return int(np.ceil((image_size + overlapping)*1.0/(tile_size - overlapping)))
+        return ceil_int((image_size + overlapping)*1.0/(tile_size - overlapping))
 
     def _get_current_tile_extent(self):
         """
@@ -258,10 +265,10 @@ class GeoImageTiler(BaseGeoImageTiler):
         bufferOffset(i) = {i == 0: dataPtr + overlapping
                           {i > 0: dataPtr + 0
         """
-        image_width = int(np.ceil(self._geo_image.shape[1] * 1.0 / self.scale))
-        image_height = int(np.ceil(self._geo_image.shape[0] * 1.0 / self.scale))
+        image_width = self._geo_image.shape[1] * 1.0 / self.scale
+        image_height = self._geo_image.shape[0] * 1.0 / self.scale
         x_tile_index = self._index % self.nx
-        y_tile_index = int(np.floor(self._index * 1.0 / self.nx))
+        y_tile_index = floor_int(self._index * 1.0 / self.nx)
 
         x_tile_size = self.tile_size[0] 
         y_tile_size = self.tile_size[1] 
@@ -331,7 +338,7 @@ class GeoImageTilerConstSize(BaseGeoImageTiler):
             Method to compute number of overlapping tiles for a given image size
             n = ceil(image_size / (tile_size - min_overlapping))
         """
-        return int(np.ceil(image_size * 1.0 / (tile_size - min_overlapping)))
+        return ceil_int(image_size * 1.0 / (tile_size - min_overlapping))
 
     @staticmethod
     def _compute_float_overlapping(tile_size, image_size, n):
@@ -353,10 +360,18 @@ class GeoImageTilerConstSize(BaseGeoImageTiler):
             [x_tile_offset, y_tile_offset, x_tile_size, y_tile_size], x_tile_index, y_tile_index
         """
         x_tile_index = self._index % self.nx
-        y_tile_index = int(np.floor(self._index * 1.0 / self.nx))
+        y_tile_index = floor_int(self._index * 1.0 / self.nx)
         x_tile_size = self.tile_size[0]
         y_tile_size = self.tile_size[1]
         x_tile_offset = int(np.round(x_tile_index * (self.tile_size[0] - self.float_overlapping_x)))
         y_tile_offset = int(np.round(y_tile_index * (self.tile_size[1] - self.float_overlapping_y)))
 
         return [x_tile_offset, y_tile_offset, x_tile_size, y_tile_size], x_tile_index, y_tile_index
+
+
+def floor_int(x):
+    return int(np.floor(x))
+
+
+def ceil_int(x):
+    return int(np.ceil(x))

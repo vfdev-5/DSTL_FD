@@ -12,6 +12,10 @@ import gdal
 import osgeo.osr
 import gdalconst
 
+from common import get_gdal_dtype, gdal_to_numpy_datatype
+
+logger = logging.getLogger(__name__)
+
 
 class GeoImage:
     """
@@ -125,7 +129,7 @@ class GeoImage:
                 if "NAME" in item:
                     subset = gdal.Open(subsets[item], gdalconst.GA_ReadOnly)
                     if subset is None:
-                        logging.error("Failed to open the subset '%s'" % str(subsets[item]))
+                        logger.error("Failed to open the subset '%s'" % str(subsets[item]))
                         continue
                     subset_image = GeoImage.from_dataset(subset)
                     self._subsets.append(subset_image)
@@ -234,7 +238,7 @@ class GeoImage:
             for i in range(1, nb_bands+1):
                 band = gdal_object.GetRasterBand(i)
                 if band is None:
-                    logging.error("Raster band %i is None" % i)
+                    logger.error("Raster band %i is None" % i)
                     continue
                 metadata.update(__fetch_metadata(band, "BAND_%i__" % i))
             return metadata
@@ -274,7 +278,7 @@ class GeoImage:
 
         transformer = gdal.Transformer(self._dataset, None, options)
         if transformer.this is None:
-            logging.warn("No geo transformer found")
+            logger.warn("No geo transformer found")
             return False
 
         self._pix2geo = transformer
@@ -313,7 +317,7 @@ class GeoImage:
             src_extent = src_rect
 
         if src_req_extent is None:
-            logging.warn('source request extent is None')
+            logger.warn('source request extent is None')
             return None
         
         if dst_width is None and dst_height is None:
@@ -327,15 +331,15 @@ class GeoImage:
         else:
             dst_extent = [dst_width, dst_height]
 
-        scaleX = dst_extent[0] * 1.0 / src_extent[2]
-        scaleY = dst_extent[1] * 1.0 / src_extent[3]
-        reqScaledW = int(min(np.ceil(scaleX * src_req_extent[2]), dst_extent[0]))
-        reqScaledH = int(min(np.ceil(scaleY * src_req_extent[3]), dst_extent[1]))
+        scale_x = dst_extent[0] * 1.0 / src_extent[2]
+        scale_y = dst_extent[1] * 1.0 / src_extent[3]
+        req_scaled_w = int(min(np.ceil(scale_x * src_req_extent[2]), dst_extent[0]))
+        req_scaled_h = int(min(np.ceil(scale_y * src_req_extent[3]), dst_extent[1]))
 
-        r = [int(np.floor(scaleX * (src_req_extent[0] - src_extent[0]))),
-             int(np.floor(scaleY * (src_req_extent[1] - src_extent[1]))),
-             reqScaledW,
-             reqScaledH]
+        r = [int(np.floor(scale_x * (src_req_extent[0] - src_extent[0]))),
+             int(np.floor(scale_y * (src_req_extent[1] - src_extent[1]))),
+             req_scaled_w,
+             req_scaled_h]
 
         nbBands = self.shape[2]
         if dtype is None:
@@ -357,7 +361,6 @@ class GeoImage:
             out[r[1]:r[1]+r[3], r[0]:r[0]+r[2], i] = data[:, :]
 
         return out
-
     
     def get_filename(self):
         """
@@ -400,6 +403,28 @@ def intersection(r1, r2):
     return rOut
 
 
+def from_ndarray(data):
+    """
+    Method instanciates GeoImage object from ndarray `data` using virtual gdal driver
+    :param data: ndarray of shape (h, w, nc)
+    :return: GeoImage instance
+    """
+    assert isinstance(data, np.ndarray), "Input should be a Numpy array"
+    assert len(data.shape) == 3, "Input data should be of shape (h, w, nc)"
+    h, w, nc = data.shape
+    # Create a synthetic gdal dataset
+    driver = gdal.GetDriverByName('MEM')
+    gdal_dtype = get_gdal_dtype(data[0, 0, 0].itemsize,
+                                data[0, 0, 0].dtype == np.complex64 or
+                                data[0, 0, 0].dtype == np.complex128)
+    ds = driver.Create('', w, h, nc, gdal_dtype)
+    for i in range(0, nc):
+        ds.GetRasterBand(i+1).WriteArray(data[:, :, i])
+
+    geo_image = GeoImage.from_dataset(ds)
+    return geo_image
+
+
 def points_to_envelope(points):
     """
     Method to convert array of points [[x1,y1],[x2,y2],...] into
@@ -419,43 +444,9 @@ def update_dtype(dtype, v):
     """
     Update dtype to be conform with nodata_value
     """
-    if isinstance(v, dtype):
-        return dtype
-    return type(v)
-
-
-def gdal_to_numpy_datatype(gdal_datatype):
-    """
-    Method to convert gdal data type to numpy dtype
-    >>> gdal_to_numpy_datatype(gdal.GDT_Float32) == np.float32
-    True
-    """
-    if gdal_datatype == gdal.GDT_Byte:
-        return np.uint8
-    elif gdal_datatype == gdal.GDT_Int16:
-        return np.int16
-    elif gdal_datatype == gdal.GDT_Int32:
-        return np.int32
-    elif gdal_datatype == gdal.GDT_UInt16:
-        return np.uint16
-    elif gdal_datatype == gdal.GDT_UInt32:
-        return np.uint32
-    elif gdal_datatype == gdal.GDT_Float32:
-        return np.float32
-    elif gdal_datatype == gdal.GDT_Float64:
-        return np.float64
-    elif gdal_datatype == gdal.GDT_CInt16:
-        # No associated type -> cast to complex64
-        return np.complex64
-    elif gdal_datatype == gdal.GDT_CInt32:
-        # No associated type -> cast to complex64
-        return np.complex64
-    elif gdal_datatype == gdal.GDT_CFloat32:
-        return np.complex64
-    elif gdal_datatype == gdal.GDT_CFloat64:
-        return np.complex128
-    else:
-        raise AssertionError("Data type '%i' is not recognized" % gdal_datatype)
+    if np.array(v).astype(dtype) != np.array(v):
+        return type(v)
+    return dtype
 
 
 
