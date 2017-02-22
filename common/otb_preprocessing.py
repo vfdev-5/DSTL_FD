@@ -30,7 +30,10 @@ def generate_rm_indices(image_id):
     Method to generate radiometric indices (ndvi, gemi, ndwi2, ndti)
     See https://www.orfeo-toolbox.org/CookBook/Applications/app_RadiometricIndices.html
     """
-    app_path = os.path.join(OTB_PATH, 'bin', 'otbcli_RadiometricIndices.bat')
+    app_name = 'otbcli_RadiometricIndices'
+    if sys.platform == 'win32':
+        app_name += '.bat'
+    app_path = os.path.join(OTB_PATH, 'bin', app_name)
     assert os.path.exists(app_path), "OTB application 'RadiometricIndices' is not found"
 
     in_fname = get_filename(image_id, '17b')
