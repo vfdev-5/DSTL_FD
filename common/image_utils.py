@@ -457,11 +457,11 @@ def generate_label_file(image_id, multi_dim=True):
         cv2.imwrite(outfname, image_data)
 
 
-def generate_label_image(image_id):
+def generate_label_image(image_id, image_type='pan'):
 
-    image_shape = get_image_data(image_id, 'pan', return_shape_only=True)   
+    image_shape = get_image_data(image_id, image_type, return_shape_only=True)   
     rpolygons = get_resized_polygons(image_id, *image_shape[:2])
-    out_size = get_image_data(image_id, 'pan', return_shape_only=True)
+    out_size = get_image_data(image_id, image_type, return_shape_only=True)
     out = np.zeros(out_size[:2], np.uint8)
     round_coords = lambda x: np.array(x).round().astype(np.int32)    
     for i, class_type in enumerate(ORDERED_LABEL_IDS):

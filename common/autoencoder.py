@@ -54,13 +54,13 @@ def create_decoding_layers(kernel=3, filter_size=64, pad=1, pool_size=2):
     ]
 
 
-def autoencoder_zero(n_classes, n_channels, input_width, input_height):
+def autoencoder_zero(n_classes, n_channels, input_width, input_height, n_filters_0=64):
 
     inputs = Input((n_channels, input_height, input_width))
 
     x = inputs
-    encoding_layers = create_encoding_layers()
-    decoding_layers = create_decoding_layers()
+    encoding_layers = create_encoding_layers(filter_size=n_filters_0)
+    decoding_layers = create_decoding_layers(filter_size=n_filters_0)
     for layer in encoding_layers:
         x = layer(x)
     for layer in decoding_layers:
