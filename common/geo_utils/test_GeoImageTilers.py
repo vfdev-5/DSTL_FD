@@ -33,6 +33,7 @@ class TestGeoImageTiler(TestCase):
         self.geo_image = GeoImage(filepath)
 
     def tearDown(self):
+        self.geo_image.close()
         # Delete temp directory
         shutil.rmtree(self.local_temp_folder)
 
@@ -194,6 +195,7 @@ class TestGeoImageTilerConstSize(TestCase):
         self.geo_image = GeoImage(filepath)
 
     def tearDown(self):
+        self.geo_image.close()
         # Delete temp directory
         shutil.rmtree(self.local_temp_folder)
 

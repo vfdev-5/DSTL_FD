@@ -12,12 +12,12 @@ from data_utils import ORDERED_LABEL_IDS, LABELS
 from image_utils import normalize
 
 
-def scale_percentile(matrix):
+def scale_percentile(matrix, q_min=0.5, q_max=99.5):
     is_gray = False
     if len(matrix.shape) == 2:
         is_gray = True
         matrix = matrix.reshape(matrix.shape + (1,))
-    matrix = (255*normalize(matrix)).astype(np.uint8)
+    matrix = (255*normalize(matrix, q_min, q_max)).astype(np.uint8)
     if is_gray:
         matrix = matrix.reshape(matrix.shape[:2])
     return matrix
@@ -38,6 +38,8 @@ def display_img_1b(img_1b_data, roi=None, **kwargs):
 
 
 def display_img_3b(img_3b_data, roi=None, **kwargs):
+    nc = img_3b_data.shape[2]
+    assert nc < 4, "Input data should have at most 3 bands"
     if roi is not None:
         # roi is [minx, miny, maxx, maxy]
         x,y,xw,yh = roi
@@ -45,9 +47,9 @@ def display_img_3b(img_3b_data, roi=None, **kwargs):
     ax_array = []
     if 'cmap' not in kwargs:
         kwargs['cmap'] = 'gray'
-
-    for i in [0,1,2]:
-        ax = plt.subplot(1,3,i+1)
+    
+    for i in range(nc):
+        ax = plt.subplot(1,nc,i+1)
         ax_array.append(ax)
         vmin = np.percentile(img_3b_data[:,:,i], 0.1)
         vmax = np.percentile(img_3b_data[:,:,i], 99.9)

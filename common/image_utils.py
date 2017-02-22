@@ -395,13 +395,13 @@ def compute_mean_std_on_tiles(trainset_ids):
     """
     ll = len(trainset_ids)
     tile_id = trainset_ids[0]
-    mean_tile_image = get_image_tile_data(os.path.join(TRAIN_DATA,tile_id)).astype(np.float)
+    mean_tile_image = get_image_tile_data(os.path.join(TRAIN_DATA,tile_id)).astype(np.float32)
     # Init mean/std images
     std_tile_image = np.power(mean_tile_image, 2)
 
     for i, tile_id in enumerate(trainset_ids[1:]):
         logging.info("-- %i/%i | %s" % (i+2, ll, tile_id))
-        tile = get_image_tile_data(os.path.join(TRAIN_DATA,tile_id)).astype(np.float)
+        tile = get_image_tile_data(os.path.join(TRAIN_DATA,tile_id)).astype(np.float32)
         mean_tile_image += tile
         std_tile_image += np.power(tile, 2)
         
@@ -412,23 +412,23 @@ def compute_mean_std_on_tiles(trainset_ids):
     return mean_tile_image, std_tile_image
 
 
-def compute_mean_std_on_images(trainset_ids, image_type='5b'):
+def compute_mean_std_on_images(trainset_ids, image_type='input'):
     """
     Method to compute mean/std input image
     :return: mean_image, std_image
     """
     ll = len(trainset_ids)
     image_id = trainset_ids[0]
-    img_Kb = get_image_data(image_id, image_type).astype(np.float)
+    img_Kb = get_image_data(image_id, image_type).astype(np.float32)
     # Init mean/std images
-    mean_image = np.zeros((3349, 3404, img_Kb.shape[2]))
+    mean_image = np.zeros((3349, 3404, img_Kb.shape[2]), dtype=np.float32)
     h, w, _ = img_Kb.shape
     mean_image[:h, :w, :] += img_Kb
     std_image = np.power(mean_image, 2)
 
     for i, image_id in enumerate(trainset_ids[1:]):
         logging.info("-- %i/%i | %s" % (i + 2, ll, image_id))
-        img_Kb = get_image_data(image_id, image_type).astype(np.float)
+        img_Kb = get_image_data(image_id, image_type).astype(np.float32)
         h, w, _ = img_Kb.shape
         mean_image[:h, :w, :] += img_Kb
         std_image[:h, :w, :] += np.power(img_Kb, 2)

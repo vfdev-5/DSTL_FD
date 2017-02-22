@@ -27,7 +27,7 @@ sys.path.append(os.path.join(OTB_PATH, 'lib', 'python'))
 
 def generate_rm_indices(image_id):
     """
-    Method to generate radiometric indices (ndvi, gemi, ndwi2, ndti)
+    Method to generate radiometric indices (ndvi, gemi, ndwi2, ndti, bi, bi2)
     See https://www.orfeo-toolbox.org/CookBook/Applications/app_RadiometricIndices.html
     """
     app_name = 'otbcli_RadiometricIndices'
@@ -42,7 +42,14 @@ def generate_rm_indices(image_id):
         logging.warn("File '%s' is already existing" % out_fname)
         return 
 
-    list_ch = ['Vegetation:NDVI', 'Vegetation:GEMI', 'Water:NDWI2', 'Water:NDTI']
+    list_ch = [
+        'Vegetation:NDVI', 
+        'Vegetation:GEMI', 
+        'Water:NDWI2', 
+        'Water:NDTI', 
+        'Soil:BI',
+        'Soil:BI2'
+    ]
 
     ram = ['-ram', '1024']
     channels = [
@@ -67,3 +74,63 @@ def generate_rm_indices(image_id):
     p.wait()
 
     
+try:
+    import otbApplication
+    
+    # The following line creates an instance of the RadiometricIndices application
+
+
+# The following lines set all the application parameters:
+RadiometricIndices.SetParameterString("in", "qb_RoadExtract.tif")
+
+# The following line execute the application
+RadiometricIndices.ExecuteAndWriteOutput()
+    
+    def compute_rm_indices_matrix(image_id, list_ch=(), channels_dict={}):
+        """
+        Method to generate radiometric indices (ndvi, gemi, ndwi2, ndti, bi, bi2)
+        See https://www.orfeo-toolbox.org/CookBook/Applications/app_RadiometricIndices.html
+        """
+        
+        RadiometricIndices = otbApplication.Registry.CreateApplication("RadiometricIndices")
+        assert RadiometricIndices is not None, "OTB application 'RadiometricIndices' is not found"
+
+        in_fname = get_filename(image_id, '17b')
+        RadiometricIndices.SetParameterString("in", in_fname)
+        
+        if len(list_ch) == 0:
+            list_ch = [
+                'Vegetation:NDVI', 
+            ]
+        RadiometricIndices.SetParameterString("list", " ".join(list_ch))
+        RadiometricIndices.SetParameterInt("ram", 1024)
+        
+        channels = ['red', 'green', ]
+        
+        channels = [
+            '-channels.red', '6',
+            '-channels.green', '3',
+            '-channels.blue', '2',
+            '-channels.nir', '7',
+            '-channels.mir', '17'
+        ]
+
+        program = [app_path, '-in', in_fname, '-out', out_fname, '-list']
+        program.extend(list_ch)
+        program.extend(ram)
+        program.extend(channels)
+
+        p = subprocess.Popen(program, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out = p.stdout.readlines()
+        err = p.stderr.readlines()
+        if len(err) > 0:
+            logging.error("RadiometricIndices failed with error : %s" % err)
+            print err
+        p.wait()
+
+except:
+    print "OTB python wrapper is not available"
+    
+    
+    
+        

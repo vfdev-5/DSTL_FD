@@ -3,7 +3,7 @@
 # Test GeoImage
 #
 
-import unittest
+from unittest import TestCase, TestLoader, TextTestRunner
 import tempfile
 import shutil
 import os
@@ -20,7 +20,7 @@ from common import get_gdal_dtype, get_dtype
 from create_synthetic_images import create
 
 
-class TestGeoImage(unittest.TestCase):
+class TestGeoImage(TestCase):
 
     def setUp(self):
         # Create local temp directory
@@ -106,3 +106,9 @@ class TestGeoImage(unittest.TestCase):
             ds.GetRasterBand(i+1).WriteArray(data[:, :, i])
         driver = None
         return ds, data
+
+        
+if __name__ == "__main__":
+
+    suite = TestLoader().loadTestsFromTestCase(TestGeoImage)
+    TextTestRunner().run(suite)
