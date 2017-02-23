@@ -10,7 +10,8 @@ import gdalconst
 from gdal_pansharpen import gdal_pansharpen
 
 from data_utils import get_filename, get_resized_polygons
-from data_utils import TRAIN_DATA, ORDERED_LABEL_IDS
+from data_utils import TRAIN_DATA, ORDERED_LABEL_IDS, LABELS
+
 
 def generate_aligned_swir(image_id):
     """
@@ -25,7 +26,7 @@ def generate_aligned_swir(image_id):
 
     img_pan = get_image_data(image_id, 'pan')
     img_swir = get_image_data(image_id, 'swir')
-    
+
     img_swir_aligned = compute_aligned_image(img_pan, img_swir)
     imwrite(outfname, img_swir_aligned)
 
@@ -52,22 +53,22 @@ def generate_pansharpened(image_id, image_type):
     """
     Method to create pansharpened images from multispectral or swir images
     Created file is placed in GENERATED_DATA folder
-    
+
     :image_type: 'ms' or 'ms*'
     """
     assert 'ms' in image_type, "Image type should be derived from 'ms'"
     outfname = get_filename(image_id, image_type + '_pan')
     if os.path.exists(outfname):
         logging.warn("File '%s' is already existing" % outfname)
-        return 
-    
+        return
+
     fname = get_filename(image_id, image_type)
     fname_pan = get_filename(image_id, 'pan')
-    gdal_pansharpen(['', fname_pan, fname, outfname])  
+    gdal_pansharpen(['', fname_pan, fname, outfname])
 
 
 def print_image_info(image_id, image_type):
-    
+
     fname = get_filename(image_id, image_type)
     img = gdal.Open(fname, gdalconst.GA_ReadOnly)
     assert img, "Image file is not found: {}".format(fname)
@@ -162,8 +163,8 @@ def normalize(in_img, q_min=0.5, q_max=99.5):
     img = (img - mins[None, :]) / maxs[None, :]
     img = img.clip(0.0, 1.0)
     img = np.reshape(img, [w, h, d])
-    return img    
-    
+    return img
+
 
 def get_gradient(im):
     # Calculate the x and y gradients using Sobel operator
@@ -242,16 +243,16 @@ def compute_aligned_image(img_master, img_slave):
             roi[0] = i * 500
             roi[1] = j * 500
             roi[2] += roi[0]
-            roi[3] += roi[1]    
-    
+            roi[3] += roi[1]
+
     tx = np.median(tx)
     ty = np.median(ty)
     mean_warp_matrix[0, 2] = tx
     mean_warp_matrix[1, 2] = ty
-    
+
     #print "mean_warp_matrix :"
     #print mean_warp_matrix
-    
+
     img_slave_aligned = np.zeros_like(img_slave)
     height, width, ll = img_slave.shape
     for i in range(ll):
@@ -262,7 +263,7 @@ def compute_aligned_image(img_master, img_slave):
                                                     flags=cv2.INTER_NEAREST + cv2.WARP_INVERSE_MAP,
                                                     borderMode=cv2.BORDER_REPLICATE
                                                     )
-   
+
     img_slave_aligned = img_slave if img_slave_aligned is None else img_slave_aligned
     return img_slave_aligned
 
@@ -336,26 +337,26 @@ def align_images(img_master, img_slave, roi, warp_mode=cv2.MOTION_TRANSLATION):
                                                         )
 
     return img_slave_aligned
-    
-    
+
+
 def make_ratios_vegetation(img_17b):
     """
         Method creates an image of all possible band ratios
-        
-        - panchromatic[0] / MS[5] = Trees, Crops, Misc manmade structures (of trees) 
-        - panchromatic[0] / MS[4] = Trees, Crops, Misc manmade structures (of trees) 
-        - MS[1] / MS[5] = Trees, Crops, Misc manmade structures (of trees) 
-        - MS[2] / MS[5] = Trees, Crops, Misc manmade structures (of trees) 
-        - MS[6] / MS[4] = Trees, Crops, Misc manmade structures (of trees) 
-        - MS[6] / MS[5] = Trees, Crops, Misc manmade structures (of trees) 
-        - MS[7] / MS[4] = Trees, Crops, Misc manmade structures (of trees) 
-        - MS[7] / MS[5] = Trees, Crops, Misc manmade structures (of trees) 
-        - MS[7] / MS[10:17] = Trees, Crops, Misc manmade structures (of trees) 
-        - MS[8] / MS[4] = Trees, Crops, Misc manmade structures (of trees) 
-        - MS[8:17] / MS[5] = Trees, Crops, Misc manmade structures (of trees) 
+
+        - panchromatic[0] / MS[5] = Trees, Crops, Misc manmade structures (of trees)
+        - panchromatic[0] / MS[4] = Trees, Crops, Misc manmade structures (of trees)
+        - MS[1] / MS[5] = Trees, Crops, Misc manmade structures (of trees)
+        - MS[2] / MS[5] = Trees, Crops, Misc manmade structures (of trees)
+        - MS[6] / MS[4] = Trees, Crops, Misc manmade structures (of trees)
+        - MS[6] / MS[5] = Trees, Crops, Misc manmade structures (of trees)
+        - MS[7] / MS[4] = Trees, Crops, Misc manmade structures (of trees)
+        - MS[7] / MS[5] = Trees, Crops, Misc manmade structures (of trees)
+        - MS[7] / MS[10:17] = Trees, Crops, Misc manmade structures (of trees)
+        - MS[8] / MS[4] = Trees, Crops, Misc manmade structures (of trees)
+        - MS[8:17] / MS[5] = Trees, Crops, Misc manmade structures (of trees)
     """
     h, w, n = img_17b.shape
-    
+
     out_n = 23
     out = np.zeros((h, w, out_n), dtype=np.float32)
     def _ratio(i, j):
@@ -387,7 +388,7 @@ def make_ratios_vegetation(img_17b):
     out[:,:,c] = _ratio(15, 5); c+= 1
     return out
 
-    
+
 def compute_mean_std_on_tiles(trainset_ids):
     """
     Method to compute mean/std tile image
@@ -404,7 +405,7 @@ def compute_mean_std_on_tiles(trainset_ids):
         tile = get_image_tile_data(os.path.join(TRAIN_DATA,tile_id)).astype(np.float32)
         mean_tile_image += tile
         std_tile_image += np.power(tile, 2)
-        
+
     mean_tile_image *= 1.0/ll
     std_tile_image *= 1.0/ll
     std_tile_image -= np.power(mean_tile_image, 2)
@@ -417,11 +418,20 @@ def compute_mean_std_on_images(trainset_ids, image_type='input'):
     Method to compute mean/std input image
     :return: mean_image, std_image
     """
+
+    max_dims = [0, 0]
+    for image_id in trainset_ids:
+        shape = get_image_data(image_id, image_type, return_shape_only=True)
+        if shape[0] > max_dims[0]:
+            max_dims[0] = shape[0]
+        if shape[1] > max_dims[1]:
+            max_dims[1] = shape[1]
+
     ll = len(trainset_ids)
     image_id = trainset_ids[0]
     img_Kb = get_image_data(image_id, image_type).astype(np.float32)
     # Init mean/std images
-    mean_image = np.zeros((3349, 3404, img_Kb.shape[2]), dtype=np.float32)
+    mean_image = np.zeros(tuple(max_dims) + (img_Kb.shape[2], ), dtype=np.float32)
     h, w, _ = img_Kb.shape
     mean_image[:h, :w, :] += img_Kb
     std_image = np.power(mean_image, 2)
@@ -459,11 +469,11 @@ def generate_label_file(image_id, multi_dim=True):
 
 def generate_label_image(image_id, image_type='pan'):
 
-    image_shape = get_image_data(image_id, image_type, return_shape_only=True)   
+    image_shape = get_image_data(image_id, image_type, return_shape_only=True)
     rpolygons = get_resized_polygons(image_id, *image_shape[:2])
     out_size = get_image_data(image_id, image_type, return_shape_only=True)
     out = np.zeros(out_size[:2], np.uint8)
-    round_coords = lambda x: np.array(x).round().astype(np.int32)    
+    round_coords = lambda x: np.array(x).round().astype(np.int32)
     for i, class_type in enumerate(ORDERED_LABEL_IDS):
         if class_type not in rpolygons:
             continue
@@ -478,11 +488,11 @@ def generate_label_image(image_id, image_type='pan'):
     return out
 
 
-def generate_label_image2(image_id):
-    
-    image_shape = get_image_data(image_id, 'pan', return_shape_only=True)   
+def generate_label_image2(image_id, image_type='pan'):
+
+    image_shape = get_image_data(image_id, image_type, return_shape_only=True)
     rpolygons = get_resized_polygons(image_id, *image_shape[:2])
-    out_size = get_image_data(image_id, 'pan', return_shape_only=True)
+    out_size = get_image_data(image_id, image_type, return_shape_only=True)
     out = np.zeros(out_size[:2] + (len(LABELS), ), np.uint8)
     out[:,:,0] = 1
     round_coords = lambda x: np.array(x).round().astype(np.int32)
@@ -497,5 +507,5 @@ def generate_label_image2(image_id):
                 interiors = [round_coords(poly.coords) for poly in polygon.interiors]
                 cv2.fillPoly(one_class_mask, interiors, 0)
         out[:,:,class_type] = one_class_mask
-        out[:,:,0] = np.bitwise_xor(out[:,:,0], np.bitwise_and(out[:,:,0], one_class_mask)) # =x ^ (x & y)        
+        out[:,:,0] = np.bitwise_xor(out[:,:,0], np.bitwise_and(out[:,:,0], one_class_mask)) # =x ^ (x & y)
     return out

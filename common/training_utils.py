@@ -33,7 +33,7 @@ def tile_iterator(image_ids_to_use, classes,
     total_n_pixels = np.array([0] * len(classes))
 
     apply_random_transformation = len(random_rotation_angles) > 0 or len(random_scales) > 0
-    
+
     if len(resolution_levels) == 0:
         resolution_levels = (1)
 
@@ -52,27 +52,27 @@ def tile_iterator(image_ids_to_use, classes,
             gimg_labels = []
             for image_id in ids:
                 gimg_labels.append(GeoImage(get_filename(image_id, 'label')))
-                
+
             for res_level in resolution_levels:
                 for i in range(len(ids)):
-                    gimg_label_tiles = GeoImageTilerConstSize(gimg_labels[i], 
-                                                              tile_size=tile_size, 
+                    gimg_label_tiles = GeoImageTilerConstSize(gimg_labels[i],
+                                                              tile_size=tile_size,
                                                               scale=res_level,
                                                               min_overlapping=overlapping)
                     gimg_tilers.append(gimg_label_tiles)
-            
+
             # gimg_tilers has 5*len(resolution_levels) instances
             # gimg_tilers ~ [img1_res1, img2_res1, ..., img5_res1, img1_res2, ...]
-            
+
             counter = 0
             max_counter = gimg_tilers[0].nx * gimg_tilers[0].ny
             while counter < max_counter:
                 all_done = True
-                
+
                 gimg_inputs = []
                 for i in ids:
                     gimg_inputs.append(GeoImage(get_filename(i, 'input')))
-                
+
                 for tiler_index, tiles in enumerate(gimg_tilers):
                     for tile_info_label in tiles:
                         all_done = False
@@ -81,7 +81,7 @@ def tile_iterator(image_ids_to_use, classes,
                         class_freq = np.array([0] *len(classes))
                         for ci, cindex in enumerate(classes):
                             class_freq[ci] += cv2.countNonZero(tile_label[:, :, cindex])
-                        
+
                         # If class representatifs are less than presence_percentage in the tile -> discard the tile
                         if np.sum(class_freq) * 100.0 / (h*w) < presence_percentage:
                            continue
@@ -94,13 +94,13 @@ def tile_iterator(image_ids_to_use, classes,
                         total_n_pixels += class_freq
 
                         tile_label = tile_label[:, :, classes]
-                        
+
                         gimg_input = gimg_inputs[tiler_index % 5]
                         scale = resolution_levels[int(np.floor(tiler_index / 5))]
-                        
+
                         #print "scale, xoffset_label, yoffset_label: ", scale, xoffset_label, yoffset_label
                         #print "tile_size[0], gimg_input.shape[1], gimg_input.shape[1] - xoffset_label", tile_size[0], gimg_input.shape[1], gimg_input.shape[1] - xoffset_label
-                        
+
                         tile_size_s = (tile_size[0]*scale, tile_size[1]*scale)
                         extent = [xoffset_label, yoffset_label, tile_size_s[0], tile_size_s[1]]
                         tile_input = gimg_input.get_data(extent, *tile_size).astype(np.float)
