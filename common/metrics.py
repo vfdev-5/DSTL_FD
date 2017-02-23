@@ -1,6 +1,7 @@
 import keras.backend as K
 # from keras.preprocessing.image import ImageDataGenerator
 
+
 def jaccard_coef(y_true, y_pred):
     # __author__ = Vladimir Iglovikov
     smooth = 1e-12
