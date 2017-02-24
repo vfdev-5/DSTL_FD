@@ -8,6 +8,9 @@ from geo_utils.GeoImageTilers import GeoImageTilerConstSize
 
 
 def tile_iterator(image_ids_to_use, classes,
+                  image_type='input',
+                  label_type='label',
+                  balance_classes=True,
                   presence_percentage=2,
                   tile_size=(256, 256),
                   mean_image=None,
@@ -51,7 +54,7 @@ def tile_iterator(image_ids_to_use, classes,
             gimg_tilers = []
             gimg_labels = []
             for image_id in ids:
-                gimg_labels.append(GeoImage(get_filename(image_id, 'label')))
+                gimg_labels.append(GeoImage(get_filename(image_id, label_type)))
 
             for res_level in resolution_levels:
                 for i in range(len(ids)):
@@ -71,29 +74,32 @@ def tile_iterator(image_ids_to_use, classes,
 
                 gimg_inputs = []
                 for i in ids:
-                    gimg_inputs.append(GeoImage(get_filename(i, 'input')))
+                    gimg_inputs.append(GeoImage(get_filename(i, image_type)))
 
                 for tiler_index, tiles in enumerate(gimg_tilers):
                     for tile_info_label in tiles:
                         all_done = False
                         tile_label, xoffset_label, yoffset_label = tile_info_label
+
                         h, w, _ = tile_label.shape
-                        class_freq = np.array([0] *len(classes))
-                        for ci, cindex in enumerate(classes):
-                            class_freq[ci] += cv2.countNonZero(tile_label[:, :, cindex])
+                        if balance_classes:
+                            class_freq = np.array([0] *len(classes))
+                            for ci, cindex in enumerate(classes):
+                                class_freq[ci] += cv2.countNonZero(tile_label[:, :, cindex])
 
-                        # If class representatifs are less than presence_percentage in the tile -> discard the tile
-                        if np.sum(class_freq) * 100.0 / (h*w) < presence_percentage:
-                           continue
-
-                        if np.sum(total_n_pixels) > 1:
-                           old_argmax = np.argmax(total_n_pixels)
-                           new_argmax = np.argmax(class_freq)
-                           if old_argmax == new_argmax:
+                            # If class representatifs are less than presence_percentage in the tile -> discard the tile
+                            if np.sum(class_freq) * 100.0 / (h*w) < presence_percentage:
                                continue
-                        total_n_pixels += class_freq
 
-                        tile_label = tile_label[:, :, classes]
+                            if np.sum(total_n_pixels) > 1:
+                               old_argmax = np.argmax(total_n_pixels)
+                               new_argmax = np.argmax(class_freq)
+                               if old_argmax == new_argmax:
+                                   continue
+                            total_n_pixels += class_freq
+
+                        if label_type == 'label':
+                            tile_label = tile_label[:, :, classes]
 
                         gimg_input = gimg_inputs[tiler_index % 5]
                         scale = resolution_levels[int(np.floor(tiler_index / 5))]
@@ -128,12 +134,14 @@ def tile_iterator(image_ids_to_use, classes,
                                                       warp_matrix,
                                                       dsize=(w, h),
                                                       flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
-
+                            
                             tile_label = cv2.warpAffine(tile_label,
                                                       warp_matrix,
                                                       dsize=(w, h),
-                                                      flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
-
+                                                      flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+                            if len(tile_label.shape) == 2:
+                                tile_label = np.expand_dims(tile_label, 2)
+  
                         assert tile_label.shape[:2] == tile_input.shape[:2], "Tile sizes are not equal: {} != {}".format \
                             (tile_label.shape[:2], tile_input.shape[:2])
                         yield tile_input, tile_label

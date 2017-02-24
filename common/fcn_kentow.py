@@ -1,6 +1,5 @@
 # https://raw.githubusercontent.com/k3nt0w/FCN_via_keras/master/FCN.py
 
-import keras_conf
 
 from keras.layers import merge, Convolution2D, Deconvolution2D, MaxPooling2D, Input, Reshape, Cropping2D, Flatten
 from keras.layers.core import Activation
