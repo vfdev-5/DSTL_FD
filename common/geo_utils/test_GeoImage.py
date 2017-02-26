@@ -30,13 +30,10 @@ class TestGeoImage(TestCase):
         # Delete temp directory
         shutil.rmtree(self.local_temp_folder)
 
-    def test_with_synthetic_image(self):
+    def _create_synthetic_image_file(self, shape, depth, is_complex):
         # Create local synthetic image:
         filepath = os.path.join(self.local_temp_folder, 'test_small_image.tif')
         metadata = {'key_1': 'value_1', 'key_2': "1 2 3", 'key_3': '3'}
-        shape = (120, 100, 2)
-        depth = 2
-        is_complex = False
         geo_transform = (13.60746033, 0.001, 0.0, 50.25013288, 0.0, -0.001)
         geo_extent = np.array([
             [geo_transform[0], geo_transform[3]],
@@ -51,7 +48,14 @@ class TestGeoImage(TestCase):
                       depth=depth, is_complex=is_complex,
                       metadata=metadata, geo_transform=geo_transform, epsg=4326)
         self.assertTrue(os.path.exists(filepath))
+        return filepath, data, geo_extent, metadata, geo_transform
 
+    def test_with_synthetic_image(self):
+        is_complex = False
+        shape = (120, 100, 2)
+        depth = 2
+        filepath, data, geo_extent, metadata, geo_transform = self._create_synthetic_image_file(shape, depth,
+                                                                                                is_complex)
         gimage = GeoImage(filepath)
         # Must add this metadata : 'IMAGE_STRUCTURE__INTERLEAVE': 'PIXEL', 'AREA_OR_POINT': 'Area'
         metadata['IMAGE_STRUCTURE__INTERLEAVE'] = 'PIXEL'
@@ -65,6 +69,29 @@ class TestGeoImage(TestCase):
         self.assertEqual(get_dtype(depth, is_complex), gimage_data.dtype)
         # verify data
         self.assertEqual(float(np.sum(data - gimage_data)), 0.0)
+
+    def test_with_synthetic_image_with_select_bands(self):
+        is_complex = False
+        shape = (120, 100, 5)
+        depth = 2
+        filepath, data, geo_extent, metadata, geo_transform = self._create_synthetic_image_file(shape, depth,
+                                                                                                is_complex)
+
+        gimage = GeoImage(filepath)
+        # Must add this metadata : 'IMAGE_STRUCTURE__INTERLEAVE': 'PIXEL', 'AREA_OR_POINT': 'Area'
+        metadata['IMAGE_STRUCTURE__INTERLEAVE'] = 'PIXEL'
+        metadata['AREA_OR_POINT'] = 'Area'
+        self.assertEqual(metadata, gimage.metadata)
+        self.assertTrue((geo_extent == gimage.geo_extent).all(),
+                        "Wrong geo extent : {} != {}".format(geo_extent, gimage.geo_extent))
+
+        select_bands=[0, 2, 4]
+        gimage_data = gimage.get_data(select_bands=select_bands)
+        self.assertEqual(shape[:2], gimage_data.shape[:2])
+        self.assertEqual(len(select_bands), gimage_data.shape[2])
+        self.assertEqual(get_dtype(depth, is_complex), gimage_data.dtype)
+        # verify data
+        self.assertEqual(float(np.sum(data[:,:,select_bands] - gimage_data)), 0.0)
 
     def test_with_virtual_image(self):
 
@@ -106,6 +133,22 @@ class TestGeoImage(TestCase):
             ds.GetRasterBand(i+1).WriteArray(data[:, :, i])
         driver = None
         return ds, data
+
+    def test_from_dataset_with_select_bands(self):
+
+        dataset, data = self._create_virt_image(100, 120, 5, np.float32)
+        gimage = GeoImage.from_dataset(dataset)
+
+        select_bands = [0, 2, 4]
+        gimage_data = gimage.get_data(nodata_value=-123, select_bands=select_bands)
+
+        # verify shape and dtype:
+        self.assertEqual(data.shape[:2], gimage_data.shape[:2])
+        self.assertEqual(len(select_bands), gimage_data.shape[2])
+        self.assertEqual(data.dtype, gimage_data.dtype)
+
+        # verify data
+        self.assertEqual(float(np.sum(data[:,:,select_bands] - gimage_data)), 0.0)
 
         
 if __name__ == "__main__":

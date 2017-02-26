@@ -73,7 +73,6 @@ def unet_upsample(x1, x2, x3, x4, x5, n_filters_0, deep):
     x = conv(x, 2*n_filters_0, deep)
     # (input_height*8, input_width*8)
 
-
     x = UpSampling2D(size=(2, 2))(x)
     x = merge([x, x1], mode='concat', concat_axis=1)
     x = conv(x, n_filters_0, deep)

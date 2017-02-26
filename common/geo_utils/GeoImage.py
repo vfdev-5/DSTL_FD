@@ -296,7 +296,7 @@ class GeoImage:
         pts = np.array([[0, 0], [w-1, 0], [w-1, h-1], [0, h-1]])
         return self.transform(pts, "pix2geo")
 
-    def get_data(self, src_rect=None, dst_width=None, dst_height=None, nodata_value=0, dtype=None):
+    def get_data(self, src_rect=None, dst_width=None, dst_height=None, nodata_value=0, dtype=None, select_bands=None):
         """
         Method to read data from image
         :param src_rect: is source extent in pixels : [x,y,w,h] where (x,y) is top-left corner. Can be None and whole image extent is used.
@@ -304,10 +304,18 @@ class GeoImage:
         :param dst_height is the output array heigth. Can be None and src_rect[3] (height) is used.
         :param nodata_value: value to fill out of bounds pixels with.
         :param dtype: force type of returned numpy array
+        :param select_bands: tuple of band indices (zero-based) to select from dataset, e.g. [0, 3, 4]. 
         Returns a numpy array
         """
         assert self._dataset is not None, "Dataset is None"
         assert self.shape[2] > 0, "Dataset has no bands" 
+        
+        if select_bands is not None:
+            assert isinstance(select_bands, list) or isinstance(select_bands, tuple), "select_bands should a tuple or list"
+            available_bands = list(range(self.shape[2]))
+            for index in select_bands:
+                assert index in available_bands, \
+                    "Index {} from select_bands is outside of available bands: {}".format(index, available_bands)
 
         if src_rect is None:
             src_req_extent = [0, 0, self.shape[1], self.shape[0]]
@@ -341,18 +349,20 @@ class GeoImage:
              req_scaled_w,
              req_scaled_h]
 
-        nbBands = self.shape[2]
+        band_indices = range(self.shape[2]) if select_bands is None else select_bands
+        nb_bands = len(band_indices) 
+
         if dtype is None:
             datatype = gdal_to_numpy_datatype(self._dataset.GetRasterBand(1).DataType)
             datatype = update_dtype(datatype, nodata_value)
         else:
             datatype = dtype
 
-        out = np.empty((dst_extent[1], dst_extent[0], nbBands), dtype=datatype)
+        out = np.empty((dst_extent[1], dst_extent[0], nb_bands), dtype=datatype)
         out.fill(nodata_value)
 
-        for i in range(nbBands):
-            band = self._dataset.GetRasterBand(i+1)
+        for i, index in enumerate(band_indices):
+            band = self._dataset.GetRasterBand(index+1)
             data = band.ReadAsArray(src_req_extent[0],
                                     src_req_extent[1],
                                     src_req_extent[2],

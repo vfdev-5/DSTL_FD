@@ -31,7 +31,8 @@ def compute_layer_outputs(input_data, model, layer_output_f_dict={}, layer_names
         layer_names = [layer.name for layer in model.layers if layer not in inputs_outputs]        
     else:
         all_layer_names = [layer.name for layer in model.layers]
-        assert set(layer_names) & set(all_layer_names) == set(layer_names), "Items {} of layer_names are not in model".format(set(layer_names) - set(layer_names))
+        assert set(layer_names) & set(all_layer_names) == set(layer_names), \
+            "Items {} of layer_names are not in model".format(set(layer_names) - set(layer_names))
 
     layer_outputs = []
     for layer_name in layer_names:
@@ -46,7 +47,7 @@ def display_layer_output(layer_name, layer_output, layer_plots_limit=None, **kwa
     assert len(layer_output.shape) == 3, "Layer output should be 3D : (n_channels, height, width) "
     plt.suptitle("%s" % layer_name)
     nc = layer_output.shape[0] if layer_plots_limit is None else min(layer_plots_limit, layer_output.shape[0])
-    n_cols = 4 
+    n_cols = 4 if nc >= 4 else nc
     n_rows = int(np.floor(nc / n_cols))
     for i in range(nc):
         plt.subplot(n_rows,n_cols,i+1)

@@ -1,3 +1,6 @@
+#
+# Code from Cogitae repository
+#
 
 from keras.layers import merge, Convolution2D, MaxPooling2D, Input, Permute
 from keras.layers import UpSampling2D, Reshape, Activation

@@ -7,7 +7,19 @@ from geo_utils.GeoImage import GeoImage
 from geo_utils.GeoImageTilers import GeoImageTilerConstSize
 
 
-def tile_iterator(image_ids_to_use, classes,
+def normalize_image(image, mean_image, std_image):
+    """
+    """    
+    out = image if image.dtype == np.float32 else image.astype(np.float32)
+    h, w, _ = out.shape
+    out -= mean_image[:h,:w,:]  # Assume that mean_image is larger or equal input image
+    out /= (std_image[:h,:w,:] + 0.00001)
+    return out
+
+
+def tile_iterator(image_ids_to_use, 
+                  channels, # input data channels to select
+                  classes, # output data classes to select
                   image_type='input',
                   label_type='label',
                   balance_classes=True,
@@ -17,7 +29,9 @@ def tile_iterator(image_ids_to_use, classes,
                   std_image=None,
                   random_rotation_angles=(0.0, 5.0, 0.0, -5.0, 0.0, 15.0, 0.0, -15.0),
                   random_scales=(),
-                  resolution_levels=(1, 2, 4)
+                  resolution_levels=(1, 2, 4),
+                  n_images_same_time=5,
+                  verbose_image_ids=False
                 ):
     """
     Method returns a random tile in which at least one class of `classes` is present more than `presence_percentage`
@@ -45,7 +59,7 @@ def tile_iterator(image_ids_to_use, classes,
         image_ids = get_image_ids(classes, gb)
         image_ids = list(set(image_ids) & set(image_ids_to_use))
         np.random.shuffle(image_ids)
-        step = 5
+        step = n_images_same_time
 
         for i, _ in enumerate(image_ids[::step]):
             e = min(step * i + step, len(image_ids))
@@ -55,7 +69,8 @@ def tile_iterator(image_ids_to_use, classes,
             gimg_labels = []
             for image_id in ids:
                 gimg_labels.append(GeoImage(get_filename(image_id, label_type)))
-
+            
+            # Create tile iterators: 5 x nb_levels
             for res_level in resolution_levels:
                 for i in range(len(ids)):
                     gimg_label_tiles = GeoImageTilerConstSize(gimg_labels[i],
@@ -80,7 +95,7 @@ def tile_iterator(image_ids_to_use, classes,
                     for tile_info_label in tiles:
                         all_done = False
                         tile_label, xoffset_label, yoffset_label = tile_info_label
-
+                        
                         h, w, _ = tile_label.shape
                         if balance_classes:
                             class_freq = np.array([0] *len(classes))
@@ -100,7 +115,8 @@ def tile_iterator(image_ids_to_use, classes,
 
                         if label_type == 'label':
                             tile_label = tile_label[:, :, classes]
-
+                            
+                        #print "np.isinf(tile_label).any()", np.isinf(tile_label).any(), tile_label.min(), tile_label.max(), tile_label.shape, tile_label.dtype
                         gimg_input = gimg_inputs[tiler_index % 5]
                         scale = resolution_levels[int(np.floor(tiler_index / 5))]
 
@@ -109,41 +125,54 @@ def tile_iterator(image_ids_to_use, classes,
 
                         tile_size_s = (tile_size[0]*scale, tile_size[1]*scale)
                         extent = [xoffset_label, yoffset_label, tile_size_s[0], tile_size_s[1]]
-                        tile_input = gimg_input.get_data(extent, *tile_size).astype(np.float)
-
+                        select_bands = None if len(channels) == gimg_input.shape[2] else channels
+                        tile_input = gimg_input.get_data(extent, *tile_size, select_bands=select_bands).astype(np.float32)
+                        
+                        #print "- np.isinf(tile_input).any()", np.isinf(tile_input).any(), tile_input.min(), tile_input.max(), tile_input.shape, tile_input.dtype
                         if mean_image is not None and std_image is not None:
                             mean_tile_image = mean_image[yoffset_label:yoffset_label + tile_size_s[1],
                                               xoffset_label:xoffset_label + tile_size_s[0], :]
                             std_tile_image = std_image[yoffset_label:yoffset_label + tile_size_s[1],
                                              xoffset_label:xoffset_label + tile_size_s[0], :]
+                            #print "mean_tile_image.shape, std_tile_image.shape : ", mean_tile_image.shape, std_tile_image.shape
                             if scale > 1:
                                 mean_tile_image = cv2.resize(mean_tile_image, dsize=tile_size, interpolation=cv2.INTER_LINEAR)
                                 std_tile_image = cv2.resize(std_tile_image, dsize=tile_size, interpolation=cv2.INTER_LINEAR)
-                            tile_input -= mean_tile_image
-                            tile_input /= (std_tile_image + 0.00001)
-
+                                
+                            tile_input = normalize_image(tile_input, mean_tile_image, std_tile_image)
+                            #tile_input -= mean_tile_image
+                            #tile_input /= (std_tile_image + 0.00001)
+                            
+                        #print "-- np.isinf(tile_input).any()", np.isinf(tile_input).any(), tile_input.min(), tile_input.max(), tile_input.shape, tile_input.dtype
                         # Add random rotation and scale
                         if apply_random_transformation:
                             sc = random_scales[np.random.randint(len(random_scales))] if len(random_scales) > 0 else 1.0
                             a = random_rotation_angles[np.random.randint(len(random_rotation_angles))] if len(random_rotation_angles) > 0 else 0.0
                             if a != 0 and sc < 1.15:
                                 sc = 1.15
-                            warp_matrix = cv2.getRotationMatrix2D((tile_size[0] // 2, tile_size[1] // 2), a, sc)
-                            h, w, _ = tile_input.shape
-                            tile_input = cv2.warpAffine(tile_input,
-                                                      warp_matrix,
-                                                      dsize=(w, h),
-                                                      flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
-                            
-                            tile_label = cv2.warpAffine(tile_label,
-                                                      warp_matrix,
-                                                      dsize=(w, h),
-                                                      flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
-                            if len(tile_label.shape) == 2:
-                                tile_label = np.expand_dims(tile_label, 2)
-  
+                            if np.abs(a) > 0.0:
+                                warp_matrix = cv2.getRotationMatrix2D((tile_size[0] / 2, tile_size[1] / 2), a, sc)
+                                h, w, _ = tile_input.shape
+                                tile_input = cv2.warpAffine(tile_input,
+                                                          warp_matrix,
+                                                          dsize=(w, h),
+                                                          flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+
+                                tile_label = cv2.warpAffine(tile_label,
+                                                          warp_matrix,
+                                                          dsize=(w, h),
+                                                          flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+                                if len(tile_label.shape) == 2:
+                                    tile_label = np.expand_dims(tile_label, 2)
+                                if len(tile_input.shape) == 2:
+                                    tile_input = np.expand_dims(tile_input, 2)
+
+                        #print "-- np.isinf(tile_label).any()", np.isinf(tile_label).any(), tile_label.min(), tile_label.max(), tile_label.shape                                            
+                        #print "--- np.isinf(tile_input).any()", np.isinf(tile_input).any(), tile_input.min(), tile_input.max(), tile_input.shape
                         assert tile_label.shape[:2] == tile_input.shape[:2], "Tile sizes are not equal: {} != {}".format \
                             (tile_label.shape[:2], tile_input.shape[:2])
+                        if verbose_image_ids:
+                            print "Image id : ", ids[tiler_index % 5], xoffset_label, yoffset_label
                         yield tile_input, tile_label
                         break
 

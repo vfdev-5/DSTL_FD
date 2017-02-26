@@ -7,8 +7,15 @@
 import numpy as np
 
 
-def compute_disc_batch(X_in, X_out, generator_model, batch_counter, patch_size, 
-                        label_smoothing=False, label_flipping=0):
+def compute_disc_patches(X_in, X_out,
+                       generator_model,
+                       batch_counter,
+                       patch_size,
+                       label_smoothing=False,
+                       label_flipping=0):
+    """
+    Method computes data for the descriminator, alternating real and generated images
+    """
 
     # Create X_disc: alternatively only generated or real images
     if batch_counter % 2 == 0:
@@ -45,11 +52,10 @@ def extract_patches(X, patch_size):
 
     # Now extract patches form X_disc
     list_X = []
-    list_row_idx = [(i * patch_size[0], (i + 1) * patch_size[0]) for i in range(X.shape[1] / patch_size[0])]
-    list_col_idx = [(i * patch_size[1], (i + 1) * patch_size[1]) for i in range(X.shape[2] / patch_size[1])]
+    list_row_idx = [(i * patch_size[0], (i + 1) * patch_size[0]) for i in range(X.shape[2] / patch_size[0])]
+    list_col_idx = [(i * patch_size[1], (i + 1) * patch_size[1]) for i in range(X.shape[3] / patch_size[1])]
 
     for row_idx in list_row_idx:
         for col_idx in list_col_idx:
             list_X.append(X[:, :, row_idx[0]:row_idx[1], col_idx[0]:col_idx[1]])
-
     return list_X

@@ -20,7 +20,7 @@ except:
         pass
 
 
-def load(model_name, in_img_dim, out_img_dim, nb_patch, bn_mode, use_mbd, batch_size):
+def load(model_name, in_img_dim, out_img_dim, nb_patch, bn_mode, use_mbd):
 
     if model_name == "generator_unet_upsampling":
         model = generator_unet_upsampling(in_img_dim, out_img_dim, bn_mode, model_name=model_name)
@@ -31,23 +31,21 @@ def load(model_name, in_img_dim, out_img_dim, nb_patch, bn_mode, use_mbd, batch_
         model = DCGAN_discriminator(out_img_dim, nb_patch, bn_mode, model_name=model_name, use_mbd=use_mbd)
         print "\n-- DCGAN  discriminator" 
         model.summary()
-        plot(model, to_file='../../figures/%s.png' % model_name, show_shapes=True, show_layer_names=True)
+        plot(model, to_file='figures/%s.png' % model_name, show_shapes=True, show_layer_names=True)
         return model
     else:
         raise Exception("Unknown model_name")
 
 
-def generator_unet_upsampling(in_img_dim, out_img_dim, bn_mode, model_name="generator_unet_upsampling"):
+def generator_unet_upsampling(in_img_dim, out_img_dim, bn_mode, model_name):
 
     nb_filters = 64
 
     if K.image_dim_ordering() == "th":
         bn_axis = 1
-        nb_channels = in_img_dim[0]
         min_s = min(in_img_dim[1:])
     else:
         bn_axis = -1
-        nb_channels = in_img_dim[-1]
         min_s = min(in_img_dim[:-1])
 
     unet_input = Input(shape=in_img_dim, name="unet_input")
@@ -85,9 +83,9 @@ def generator_unet_upsampling(in_img_dim, out_img_dim, bn_mode, model_name="gene
     x = Activation("relu")(list_decoder[-1])
     x = UpSampling2D(size=(2, 2))(x)
     x = Convolution2D(out_img_dim[0], 3, 3, name="last_conv", border_mode="same")(x)
-    x = Activation("tanh")(x)
+    x = Activation("sigmoid")(x)
 
-    generator_unet = Model(input=[unet_input], output=[x])
+    generator_unet = Model(input=[unet_input], output=[x], name=model_name)
 
     return generator_unet
 
@@ -116,7 +114,7 @@ def up_conv_block_unet(x, x2, f, name, bn_mode, bn_axis, bn=True, dropout=False)
     return x
 
 
-def deconv_block_unet(x, x2, f, h, w, batch_size, name, bn_mode, bn_axis, bn=True, dropout=False):
+def deconv_block_unet(x, x2, f, h, w, batch_size, bn_mode, bn_axis, bn=True, dropout=False):
 
     o_shape = (batch_size, h * 2, w * 2, f)
     x = Activation("relu")(x)
@@ -151,7 +149,6 @@ def PatchGAN(nb_filters, img_dim, bn_mode, bn_axis):
     x = Dense(2, activation='softmax', name="disc_dense")(x_flat)
 
     return Model(input=[x_input], output=[x, x_flat], name="PatchGAN")
-
 
 
 def DCGAN_discriminator(img_dim, nb_patch, bn_mode, model_name="DCGAN_discriminator", use_mbd=True):

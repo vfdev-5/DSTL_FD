@@ -12,6 +12,10 @@ from data_utils import ORDERED_LABEL_IDS, LABELS
 from image_utils import normalize
 
 
+def plt_st(l1,l2):
+    plt.figure(figsize=(l1,l2))
+
+
 def scale_percentile(matrix, q_min=0.5, q_max=99.5):
     is_gray = False
     if len(matrix.shape) == 2:
@@ -31,9 +35,12 @@ def display_img_1b(img_1b_data, roi=None, **kwargs):
 
     if 'cmap' not in kwargs:
         kwargs['cmap'] = 'gray'
-    vmin = np.percentile(img_1b_data, 0.1)
-    vmax = np.percentile(img_1b_data, 99.9)
-    plt.imshow(img_1b_data, clim=[vmin, vmax], **kwargs)
+
+    if 'clim' not in kwargs:
+        vmin = np.percentile(img_1b_data, 0.1)
+        vmax = np.percentile(img_1b_data, 99.9)
+        kwargs['clim'] = [vmin, vmax]
+    plt.imshow(img_1b_data, **kwargs)
     plt.colorbar(orientation='horizontal')
 
 
@@ -47,13 +54,14 @@ def display_img_3b(img_3b_data, roi=None, **kwargs):
     ax_array = []
     if 'cmap' not in kwargs:
         kwargs['cmap'] = 'gray'
-    
+
     for i in range(nc):
         ax = plt.subplot(1,nc,i+1)
         ax_array.append(ax)
-        vmin = np.percentile(img_3b_data[:,:,i], 0.1)
-        vmax = np.percentile(img_3b_data[:,:,i], 99.9)
-        plt.imshow(img_3b_data[:,:,i], clim=[vmin, vmax], **kwargs)
+        vmin = np.percentile(img_3b_data[:, :, i], 0.1)
+        vmax = np.percentile(img_3b_data[:, :, i], 99.9)
+        kwargs['clim'] = [vmin, vmax]
+        plt.imshow(img_3b_data[:,:,i], **kwargs)
         plt.colorbar(orientation='horizontal')
         plt.title("Channel %i" % i)
 
@@ -71,7 +79,8 @@ def display_img_8b(img_ms_data, roi=None, **kwargs):
         ax_array.append(ax)
         vmin = np.percentile(img_ms_data[:, :, i], 0.1)
         vmax = np.percentile(img_ms_data[:, :, i], 99.9)
-        plt.imshow(img_ms_data[:, :, i], clim=[vmin, vmax], **kwargs)
+        kwargs['clim'] = [vmin, vmax]
+        plt.imshow(img_ms_data[:, :, i],  **kwargs)
         plt.colorbar(orientation='horizontal')
         plt.title("Channel %i" % i)
     return ax_array

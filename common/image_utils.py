@@ -150,10 +150,15 @@ def to_gdal(dtype):
         return gdal.GDT_Unknown
 
 
-def normalize(in_img, q_min=0.5, q_max=99.5):
+def normalize(in_img, q_min=0.5, q_max=99.5, return_mins_maxs=False):
     """
     Normalize image in [0.0, 1.0]
+    mins is array of minima
+    maxs is array of differences between maxima and minima
     """
+    init_shape = in_img.shape
+    if len(init_shape) == 2:
+        in_img = np.expand_dims(in_img, axis=2)
     w, h, d = in_img.shape
     img = in_img.copy()
     img = np.reshape(img, [w * h, d]).astype(np.float64)
@@ -163,6 +168,10 @@ def normalize(in_img, q_min=0.5, q_max=99.5):
     img = (img - mins[None, :]) / maxs[None, :]
     img = img.clip(0.0, 1.0)
     img = np.reshape(img, [w, h, d])
+    if init_shape != img.shape:
+        img = img.reshape(init_shape)
+    if return_mins_maxs:
+        return img, mins, maxs
     return img
 
 
@@ -266,6 +275,45 @@ def compute_aligned_image(img_master, img_slave):
 
     img_slave_aligned = img_slave if img_slave_aligned is None else img_slave_aligned
     return img_slave_aligned
+
+
+def median_blur(img, ksize):
+    init_shape = img.shape
+    img2 = np.expand_dims(img, axis=2) if len(init_shape) == 2 else img
+    out = np.zeros_like(img2)
+    img_n, mins, maxs = normalize(img2, return_mins_maxs=True)
+    for i in range(img2.shape[2]):
+        img_temp = (255.0*img_n[:,:,i]).astype(np.uint8)
+        img_temp = 1.0/255.0 * cv2.medianBlur(img_temp, ksize).astype(img.dtype)
+        out[:,:,i] = maxs[i] * img_temp + mins[i]
+    out = out.reshape(init_shape)
+    return out
+
+
+def spot_cleaning(img, ksize, threshold=0.15):
+    """
+    ksize : kernel size for median blur
+    threshold for outliers, [0.0,1.0]
+    https://github.com/kmader/Quantitative-Big-Imaging-2016/blob/master/Lectures/02-Slides.pdf
+    """
+    init_type = img.dtype
+    init_shape = img.shape
+    if len(init_shape) == 2:
+        img = img[:, :, None]
+    img_median = median_blur(img, ksize).astype(np.float32)
+    diff = np.abs(img.astype(np.float32) - img_median)
+    diff = np.mean(diff, axis=2)
+    diff = normalize(diff, q_min=0, q_max=100)
+    diff2 = diff.copy()
+    _, diff = cv2.threshold(diff, threshold, 1.0, cv2.THRESH_BINARY)
+    _, diff2 = cv2.threshold(diff2, threshold, 1.0, cv2.THRESH_BINARY_INV)
+
+    img_median2 = img_median * diff[:, :, None]
+    img2 = img * diff2[:, :, None]
+    img2 += img_median2
+    if img2.shape != init_shape:
+        img2 = img2.reshape(init_shape)
+    return img2.astype(init_type)
 
 
 def align_images(img_master, img_slave, roi, warp_mode=cv2.MOTION_TRANSLATION):
@@ -413,40 +461,43 @@ def compute_mean_std_on_tiles(trainset_ids):
     return mean_tile_image, std_tile_image
 
 
-def compute_mean_std_on_images(trainset_ids, image_type='input'):
+def compute_mean_std_on_images(trainset_ids, image_type='input', feature_wise=False):
     """
     Method to compute mean/std input image
     :return: mean_image, std_image
     """
 
     max_dims = [0, 0]
+    nc = 0
     for image_id in trainset_ids:
         shape = get_image_data(image_id, image_type, return_shape_only=True)
         if shape[0] > max_dims[0]:
             max_dims[0] = shape[0]
         if shape[1] > max_dims[1]:
             max_dims[1] = shape[1]
+        if shape[2] > nc:
+            nc = shape[2]
 
     ll = len(trainset_ids)
-    image_id = trainset_ids[0]
-    img_Kb = get_image_data(image_id, image_type).astype(np.float32)
     # Init mean/std images
-    mean_image = np.zeros(tuple(max_dims) + (img_Kb.shape[2], ), dtype=np.float32)
-    h, w, _ = img_Kb.shape
-    mean_image[:h, :w, :] += img_Kb
-    std_image = np.power(mean_image, 2)
-
-    for i, image_id in enumerate(trainset_ids[1:]):
-        logging.info("-- %i/%i | %s" % (i + 2, ll, image_id))
+    mean_image = np.zeros(tuple(max_dims) + (nc, ), dtype=np.float32)
+    std_image = np.zeros(tuple(max_dims) + (nc,), dtype=np.float32)
+    for i, image_id in enumerate(trainset_ids):
+        logging.info("-- %i/%i | %s" % (i + 1, ll, image_id))
         img_Kb = get_image_data(image_id, image_type).astype(np.float32)
         h, w, _ = img_Kb.shape
-        mean_image[:h, :w, :] += img_Kb
-        std_image[:h, :w, :] += np.power(img_Kb, 2)
+        if feature_wise:
+            mean_image[:h, :w, :] += np.mean(img_Kb, axis=(0, 1))
+            std_image[:h, :w, :] += np.std(img_Kb, axis=(0, 1))
+        else:
+            mean_image[:h, :w, :] += img_Kb
+            std_image[:h, :w, :] += np.power(img_Kb, 2.0)
 
     mean_image *= 1.0 / ll
     std_image *= 1.0 / ll
-    std_image -= np.power(mean_image, 2)
-    std_image = np.sqrt(std_image)
+    if not feature_wise:
+        std_image -= np.power(mean_image, 2.0)
+        std_image = np.sqrt(std_image)
     return mean_image, std_image
 
 
