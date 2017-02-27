@@ -22,7 +22,7 @@ def unet(n_classes, n_channels, input_width, input_height, bn_mode=2, use_deconv
     bn_axis = 1
     min_s = min(input_width, input_height)
 
-    inputs = Input(shape=(n_channels, input_width, input_height))
+    inputs = Input(shape=(n_channels, input_height, input_width))
 
     # Prepare encoder filters
     nb_conv = int(np.floor(np.log(min_s) / np.log(2)))
