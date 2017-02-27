@@ -4,6 +4,7 @@ import sys
 sys.path.append("../common")
 
 import numpy as np
+import cv2
 
 from data_utils import get_filename
 from preprocessing_utils import create_pan_rad_inds_ms
@@ -12,7 +13,7 @@ from geo_utils.GeoImage import from_ndarray, GeoImage
 from training_utils import normalize_image
 
 
-def compute_predictions(image_id, model, mean_image=None, std_image=None, batch_size=4, out_size=(3500, 3500)):
+def compute_predictions(image_id, model, mean_image=None, std_image=None, batch_size=4, scale=1, out_size=(3500, 3500)):
     """
     Method to compute predictions using trained model
     :param image_id: input image id on which compute predictions
@@ -34,16 +35,22 @@ def compute_predictions(image_id, model, mean_image=None, std_image=None, batch_
     else:
         gimg = GeoImage(image_filename)
 
-    tiles = GeoImageTilerConstSize(gimg, tile_size, overlapping)
+    tiles = GeoImageTilerConstSize(gimg, tile_size, overlapping, scale=scale)
     count = 0
     X = np.zeros((batch_size, model.input_shape[1], tile_size[1], tile_size[0]), dtype=np.float32)
     xs = []
     ys = []
     for tile, x, y in tiles:
 
+        tile_size_s = (tile_size[0] * scale, tile_size[1] * scale)
+
         if mean_image is not None and std_image is not None:
-            mean_tile_image = mean_image[y:y + tile_size[1], x:x + tile_size[0], :]
-            std_tile_image = std_image[y:y + tile_size[1], x:x + tile_size[0], :]
+            mean_tile_image = mean_image[y:y + tile_size_s[1], x:x + tile_size_s[0], :]
+            std_tile_image = std_image[y:y + tile_size_s[1], x:x + tile_size_s[0], :]
+            if scale > 1:
+                mean_tile_image = cv2.resize(mean_tile_image, dsize=tile_size, interpolation=cv2.INTER_LINEAR)
+                std_tile_image = cv2.resize(std_tile_image, dsize=tile_size, interpolation=cv2.INTER_LINEAR)
+
             tile = normalize_image(tile, mean_tile_image, std_tile_image)
 
         X[count, :, :, :] = tile.transpose([2, 0, 1])
@@ -54,8 +61,10 @@ def compute_predictions(image_id, model, mean_image=None, std_image=None, batch_
         if count == batch_size:
             Y_pred = model.predict_on_batch(X)
             for i in range(batch_size):
-                Y_predictions[ys[i]:ys[i] + tile_size[1], xs[i]:xs[i] + tile_size[0], :] = \
-                    Y_pred[i, :, :, :].transpose([1, 2, 0])
+                img = Y_pred[i, :, :, :].transpose([1, 2, 0])
+                if scale > 1:
+                    img = cv2.resize(img, dsize=tile_size_s, interpolation=cv2.INTER_LINEAR)
+                Y_predictions[ys[i]:ys[i] + tile_size_s[1], xs[i]:xs[i] + tile_size_s[0], :] = img
             count = 0
             xs = []
             ys = []
