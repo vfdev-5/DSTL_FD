@@ -5,6 +5,7 @@ import cv2
 from data_utils import TRAIN_WKT, get_image_ids, get_filename
 from geo_utils.GeoImage import GeoImage
 from geo_utils.GeoImageTilers import GeoImageTilerConstSize
+from image_utils import get_image_data
 
 
 def normalize_image(image, mean_image, std_image):
@@ -29,7 +30,7 @@ def tile_iterator(image_ids_to_use,
                   std_image=None,
                   random_rotation_angles=(0.0, 5.0, 0.0, -5.0, 0.0, 15.0, 0.0, -15.0),
                   random_scales=(),
-                  resolution_levels=(1, 2, 4),
+                  resolution_levels=(1,),
                   n_images_same_time=5,
                   verbose_image_ids=False
                 ):
@@ -48,11 +49,10 @@ def tile_iterator(image_ids_to_use,
     overlapping = int(min(tile_size[0], tile_size[1]) * 0.25)
 
     total_n_pixels = np.array([0] * len(classes))
-
-    apply_random_transformation = len(random_rotation_angles) > 0 or len(random_scales) > 0
+    apply_random_transformation = (len(random_rotation_angles) > 0 or len(random_scales) > 0)
 
     if len(resolution_levels) == 0:
-        resolution_levels = (1)
+        resolution_levels = (1,)
 
     while True:
 
@@ -140,9 +140,7 @@ def tile_iterator(image_ids_to_use,
                                 std_tile_image = cv2.resize(std_tile_image, dsize=tile_size, interpolation=cv2.INTER_LINEAR)
                                 
                             tile_input = normalize_image(tile_input, mean_tile_image, std_tile_image)
-                            #tile_input -= mean_tile_image
-                            #tile_input /= (std_tile_image + 0.00001)
-                            
+
                         #print "-- np.isinf(tile_input).any()", np.isinf(tile_input).any(), tile_input.min(), tile_input.max(), tile_input.shape, tile_input.dtype
                         # Add random rotation and scale
                         if apply_random_transformation:
@@ -180,3 +178,57 @@ def tile_iterator(image_ids_to_use,
                 # Check if all tilers have done the iterations
                 if all_done:
                     break
+
+
+def get_XY_val(val_ids,
+               channels,
+               labels,
+               image_type='input',
+               label_type='label',
+               mean_image=None,
+               std_image=None):
+    ll = len(val_ids)
+    n_channels = len(channels)
+    n_labels = len(labels)
+
+    size = [0, 0]
+    for image_id in val_ids:
+        image_shape = get_image_data(image_id, image_type, return_shape_only=True)
+        label_image_shape = get_image_data(image_id, label_type, return_shape_only=True)
+        h = max(image_shape[0], label_image_shape[0])
+        w = max(image_shape[1], label_image_shape[1])
+        if h > size[0]:
+            size[0] = h
+        if w > size[1]:
+            size[1] = w
+
+    size = tuple(size)
+    X = np.zeros((ll, n_channels) + size, dtype=np.float32)
+    Y = np.zeros((ll, n_labels) + size, dtype=np.float32)
+
+    if mean_image is not None and std_image is not None:
+        if n_channels < mean_image.shape[2]:
+            mean_image = mean_image[:, :, channels]
+            std_image = std_image[:, :, channels]
+
+    for i, image_id in enumerate(val_ids):
+        image = get_image_data(image_id, image_type).astype(np.float32)
+        label_image = get_image_data(image_id, label_type).astype(np.float32)
+
+        if n_channels < image.shape[2]:
+            image = image[:, :, channels]
+
+        if n_labels < label_image.shape[2]:
+            label_image = label_image[:, :, labels]
+
+        if mean_image is not None and std_image is not None:
+            image = normalize_image(image, mean_image, std_image)
+
+        h, w, _ = image.shape
+        hl, wl, _ = label_image.shape
+        image = image.transpose([2, 0, 1])
+        label_image = label_image.transpose([2, 0, 1])
+        X[i, :, :h, :w] = image
+        Y[i, :, :hl, :wl] = label_image
+
+    return X, Y

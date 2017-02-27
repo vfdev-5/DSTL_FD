@@ -27,7 +27,7 @@ def scale_percentile(matrix, q_min=0.5, q_max=99.5):
     return matrix
 
 
-def display_img_1b(img_1b_data, roi=None, **kwargs):
+def display_img_1b(img_1b_data, roi=None, no_colorbar=False, **kwargs):
     if roi is not None:
         # roi is [minx, miny, maxx, maxy]
         x,y,xw,yh = roi
@@ -41,7 +41,8 @@ def display_img_1b(img_1b_data, roi=None, **kwargs):
         vmax = np.percentile(img_1b_data, 99.9)
         kwargs['clim'] = [vmin, vmax]
     plt.imshow(img_1b_data, **kwargs)
-    plt.colorbar(orientation='horizontal')
+    if not no_colorbar:
+        plt.colorbar(orientation='horizontal')
 
 
 def display_img_3b(img_3b_data, roi=None, **kwargs):

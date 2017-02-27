@@ -210,7 +210,6 @@ class TestGeoImageTilerConstSize(TestCase):
                 self.assertTrue(tile.shape[:2] == (tile_size[1], tile_size[0]))
                 tiled_image[y:y+tile_size[1], x:x+tile_size[0], :] = tile
 
-
             err = float(np.sum(tiled_image - self.geo_image.get_data()))
             logging.debug("Err : %f" % err)
             self.assertTrue(np.abs(err) < 1e-10)
