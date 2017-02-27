@@ -116,5 +116,6 @@ def create_pan_rad_inds_ms(image_id, sc_threshold=0.1, remove_generated_files=Fa
 
     if remove_generated_files:
         os.remove(get_filename(image_id, 'multi'))
+        os.remove(get_filename(image_id, '17b'))
 
     return x

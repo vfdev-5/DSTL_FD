@@ -1,5 +1,6 @@
+
+import numpy as np
 import keras.backend as K
-# from keras.preprocessing.image import ImageDataGenerator
 
 
 def jaccard_coef(y_true, y_pred):
@@ -19,3 +20,11 @@ def jaccard_coef_int(y_true, y_pred):
     sum_ = K.sum(y_true + y_pred, axis=[0, -1, -2])
     jac = (intersection + smooth) / (sum_ - intersection + smooth)
     return K.mean(jac)
+
+
+def score(y_true, y_pred):
+    smooth = 1e-12
+    intersection = np.sum(y_true * y_pred, axis=(0, 1))
+    sum_ = np.sum(y_true + y_pred, axis=(0, 1))
+    jac = (intersection + smooth) / (sum_ - intersection + smooth)
+    return np.mean(jac)
