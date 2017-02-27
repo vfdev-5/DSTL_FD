@@ -362,8 +362,6 @@ def align_images(img_master, img_slave, roi, warp_mode=cv2.MOTION_TRANSLATION):
         mean_warp_matrix += warp_matrix
 
     mean_warp_matrix *= 1.0/ll
-    #print "Mean Warp matrix: ",
-    #print mean_warp_matrix
 
     for i in range(ll):
 
@@ -461,7 +459,7 @@ def compute_mean_std_on_tiles(trainset_ids):
     return mean_tile_image, std_tile_image
 
 
-def compute_mean_std_on_images(trainset_ids, image_type='input', feature_wise=False):
+def compute_mean_std_on_images(trainset_ids, image_type='input', feature_wise=False, out_shape=None):
     """
     Method to compute mean/std input image
     :return: mean_image, std_image
@@ -469,14 +467,18 @@ def compute_mean_std_on_images(trainset_ids, image_type='input', feature_wise=Fa
 
     max_dims = [0, 0]
     nc = 0
-    for image_id in trainset_ids:
-        shape = get_image_data(image_id, image_type, return_shape_only=True)
-        if shape[0] > max_dims[0]:
-            max_dims[0] = shape[0]
-        if shape[1] > max_dims[1]:
-            max_dims[1] = shape[1]
-        if shape[2] > nc:
-            nc = shape[2]
+    if out_shape is None:
+        for image_id in trainset_ids:
+            shape = get_image_data(image_id, image_type, return_shape_only=True)
+            if shape[0] > max_dims[0]:
+                max_dims[0] = shape[0]
+            if shape[1] > max_dims[1]:
+                max_dims[1] = shape[1]
+            if shape[2] > nc:
+                nc = shape[2]
+    else:
+        max_dims = out_shape[:2]
+        nc = out_shape[2]
 
     ll = len(trainset_ids)
     # Init mean/std images
