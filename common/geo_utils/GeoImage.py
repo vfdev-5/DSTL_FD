@@ -311,7 +311,8 @@ class GeoImage:
         assert self.shape[2] > 0, "Dataset has no bands" 
         
         if select_bands is not None:
-            assert isinstance(select_bands, list) or isinstance(select_bands, tuple), "select_bands should a tuple or list"
+            assert isinstance(select_bands, list) or isinstance(select_bands, tuple), \
+                "Argument select_bands should be a tuple or list"
             available_bands = list(range(self.shape[2]))
             for index in select_bands:
                 assert index in available_bands, \

@@ -54,6 +54,11 @@ def tile_iterator(image_ids_to_use,
     if len(resolution_levels) == 0:
         resolution_levels = (1,)
 
+    if mean_image is not None and std_image is not None:
+        if len(channels) < mean_image.shape[2]:
+            mean_image = mean_image[:, :, channels]
+            std_image = std_image[:, :, channels]
+
     while True:
 
         image_ids = get_image_ids(classes, gb)
@@ -125,7 +130,7 @@ def tile_iterator(image_ids_to_use,
 
                         tile_size_s = (tile_size[0]*scale, tile_size[1]*scale)
                         extent = [xoffset_label, yoffset_label, tile_size_s[0], tile_size_s[1]]
-                        select_bands = None if len(channels) == gimg_input.shape[2] else channels
+                        select_bands = None if len(channels) == gimg_input.shape[2] else channels.tolist()
                         tile_input = gimg_input.get_data(extent, *tile_size, select_bands=select_bands).astype(np.float32)
                         
                         #print "- np.isinf(tile_input).any()", np.isinf(tile_input).any(), tile_input.min(), tile_input.max(), tile_input.shape, tile_input.dtype
