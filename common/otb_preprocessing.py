@@ -75,50 +75,97 @@ def generate_rm_indices(image_id):
 
     
 try:
-    import otbApplication
-    
-    # The following line creates an instance of the RadiometricIndices application
-    # def compute_rm_indices_matrix(image_id, list_ch=(), channels_dict={}):
-    #     """
-    #     Method to generate radiometric indices (ndvi, gemi, ndwi2, ndti, bi, bi2)
-    #     See https://www.orfeo-toolbox.org/CookBook/Applications/app_RadiometricIndices.html
-    #     """
-    #
-    #     RadiometricIndices = otbApplication.Registry.CreateApplication("RadiometricIndices")
-    #     assert RadiometricIndices is not None, "OTB application 'RadiometricIndices' is not found"
-    #
-    #     in_fname = get_filename(image_id, '17b')
-    #     RadiometricIndices.SetParameterString("in", in_fname)
-    #
-    #     if len(list_ch) == 0:
-    #         list_ch = [
-    #             'Vegetation:NDVI',
-    #         ]
-    #     RadiometricIndices.SetParameterString("list", " ".join(list_ch))
-    #     RadiometricIndices.SetParameterInt("ram", 1024)
-    #
-    #     channels = ['red', 'green', ]
-    #
-    #     channels = [
-    #         '-channels.red', '6',
-    #         '-channels.green', '3',
-    #         '-channels.blue', '2',
-    #         '-channels.nir', '7',
-    #         '-channels.mir', '17'
-    #     ]
+    import otbApplication    
 
-        # program = [app_path, '-in', in_fname, '-out', out_fname, '-list']
-        # program.extend(list_ch)
-        # program.extend(ram)
-        # program.extend(channels)
-        #
-        # p = subprocess.Popen(program, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        # out = p.stdout.readlines()
-        # err = p.stderr.readlines()
-        # if len(err) > 0:
-        #     logging.error("RadiometricIndices failed with error : %s" % err)
-        #     print err
-        # p.wait()
+    import numpy as np
+    from image_utils import get_image_data  
+
+    # The following line creates an instance of the RadiometricIndices application
+    RadiometricIndices = otbApplication.Registry.CreateApplication("RadiometricIndices")
+    assert RadiometricIndices is not None, "OTB application 'RadiometricIndices' is not found"
+ 
+    # Vegetation:NDVI - Normalized difference vegetation index (Red, NIR) 
+    # Vegetation:TNDVI - Transformed normalized difference vegetation index (Red, NIR) 
+    # Vegetation:RVI - Ratio vegetation index (Red, NIR) 
+    # Vegetation:SAVI - Soil adjusted vegetation index (Red, NIR) 
+    # Vegetation:TSAVI - Transformed soil adjusted vegetation index (Red, NIR) 
+    # Vegetation:MSAVI - Modified soil adjusted vegetation index (Red, NIR) 
+    # Vegetation:MSAVI2 - Modified soil adjusted vegetation index 2 (Red, NIR) 
+    # Vegetation:GEMI - Global environment monitoring index (Red, NIR) 
+    # Vegetation:IPVI - Infrared percentage vegetation index (Red, NIR) 
+    # Water:NDWI - Normalized difference water index (Gao 1996) (NIR, MIR) 
+    # Water:NDWI2 - Normalized difference water index (Mc Feeters 1996) (Green, NIR) 
+    # Water:MNDWI - Modified normalized difference water index (Xu 2006) (Green, MIR) 
+    # Water:NDPI - Normalized difference pond index (Lacaux et al.) (MIR, Green) 
+    # Water:NDTI - Normalized difference turbidity index (Lacaux et al.) (Red, Green) 
+    # Soil:RI - Redness index (Red, Green) 
+    # Soil:CI - Color index (Red, Green) 
+    # Soil:BI - Brightness index (Red, Green) 
+    # Soil:BI2
+
+
+    # Define additional info
+    _out_channels_dict = {
+        'ndvi': 'Vegetation:NDVI',
+        'ndwi': 'Water:NDWI',
+        'ndwi2': 'Water:NDWI2',
+        'ndpi': 'Water:NDPI',
+        'ndti': 'Water:NDTI',
+        'mndwi': 'Water:MNDWI',
+        'bi': 'Soil:BI',
+        'bi2': 'Soil:BI2'    
+    }
+    _channels = ['red', 'green', 'blue', 'nir', 'mir']    
+
+
+    def compute_rm_indices(image_5b, user_out_channels):
+        """
+        Method to compute radiometric indices from image with 5 bands: R, G, B, NIR, MIR            
+        """
+        RadiometricIndices.SetVectorImageFromNumpyArray('in', image_5b)
+        RadiometricIndices.SetParameterInt("ram", 1024)
+        list_ch = [_out_channels_dict[c] for c in user_out_channels]
+        RadiometricIndices.SetParameterStringList("list", list_ch)
+        
+        for i, c in enumerate(_channels):
+            RadiometricIndices.SetParameterInt('channels.%s' % c, i+1)
+        RadiometricIndices.Execute()
+        output = RadiometricIndices.GetVectorImageAsNumpyArray('out')
+        return output.copy()
+
+
+    def compute_rm_indices_image(image_id, user_out_channels, user_channels_dict):
+        """
+        Method to compute radiometric indices using OTB python wrapper
+        """        
+        # Determine needed image type
+        image_types = np.unique([image_type for image_type, _ in user_channels_dict.values()])
+
+        h, w = (0, 0)
+        imgs = {}
+        for image_type in image_types:
+            if image_type == 'ms':
+                imgs[image_type] = get_image_data(image_id, image_type + '_pan')
+                h = max(h, imgs[image_type].shape[0])
+                w = max(w, imgs[image_type].shape[1])
+            elif image_type == '3b':
+                imgs[image_type] = get_image_data(image_id, image_type)
+                h = max(h, imgs[image_type].shape[0])
+                w = max(w, imgs[image_type].shape[1])        
+            elif image_type == 'swir':
+                imgs[image_type] = get_image_data(image_id, image_type + '_aligned_upsampled')
+                h = max(h, imgs[image_type].shape[0])
+                w = max(w, imgs[image_type].shape[1])        
+
+        # ndarray composed of red, green, blue, nir, mir        
+        in_array = np.zeros((h, w, 5), dtype=np.uint16)
+
+        for i, c in enumerate(_channels):
+            image_type, band_index = user_channels_dict[c]
+            h, w, _ = imgs[image_type].shape
+            in_array[:h,:w,i] = imgs[image_type][:,:,band_index]
+           
+        return compute_rm_indices(in_array, user_out_channels)
 
 except:
     print "OTB python wrapper is not available"

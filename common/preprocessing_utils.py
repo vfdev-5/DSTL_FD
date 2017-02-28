@@ -119,3 +119,32 @@ def create_pan_rad_inds_ms(image_id, sc_threshold=0.1, remove_generated_files=Fa
         os.remove(get_filename(image_id, '17b'))
 
     return x
+
+
+def _CCCI_index(img_ms, img_rgb):
+    RE  = img_ms[:,:,5]#.astype(np.float32)
+    MIR = img_ms[:,:,7]#.astype(np.float32)
+    R = img_rgb[:,:,0]#.astype(np.float32)
+    # canopy chloropyll content index
+    CCCI = (MIR-RE)/(MIR+RE)*(MIR-R)/(MIR+R)
+    return CCCI  
+
+
+def _CCCI_index2(img_ms, img_rgb):
+    RE  = img_ms[:,:,5].astype(np.float32)
+    MIR = img_ms[:,:,7].astype(np.float32)
+    R = img_rgb[:,:,0].astype(np.float32)
+    # canopy chloropyll content index
+    CCCI = (MIR-RE)/(MIR+RE)*(MIR-R)/(MIR+R)
+    return CCCI  
+
+
+def CCCI_index(image_id, good=False):
+    img_rgb = get_image_data(image_id, '3b')
+    img_ms = get_image_data(image_id, 'ms_pan')
+    h = min(img_rgb.shape[0], img_ms.shape[0])
+    w = min(img_rgb.shape[1], img_ms.shape[1])
+    if good:
+        return _CCCI_index2(img_ms[:h, :w, :], img_rgb[:h, :w, :])
+    return _CCCI_index(img_ms[:h, :w, :], img_rgb[:h, :w, :])
+

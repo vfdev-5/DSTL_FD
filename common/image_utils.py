@@ -520,14 +520,15 @@ def generate_label_file(image_id, multi_dim=True):
         cv2.imwrite(outfname, image_data)
 
 
-def generate_label_image(image_id, image_type='pan'):
+def generate_label_image(image_id, image_type='pan', labels=None):
 
     image_shape = get_image_data(image_id, image_type, return_shape_only=True)
     rpolygons = get_resized_polygons(image_id, *image_shape[:2])
     out_size = get_image_data(image_id, image_type, return_shape_only=True)
     out = np.zeros(out_size[:2], np.uint8)
     round_coords = lambda x: np.array(x).round().astype(np.int32)
-    for i, class_type in enumerate(ORDERED_LABEL_IDS):
+    label_ids = ORDERED_LABEL_IDS if labels is None else [i for i in ORDERED_LABEL_IDS if i in labels]
+    for i, class_type in enumerate(label_ids):
         if class_type not in rpolygons:
             continue
         one_class_mask = np.zeros(out_size[:2], np.uint8)
@@ -562,3 +563,7 @@ def generate_label_image2(image_id, image_type='pan'):
         out[:,:,class_type] = one_class_mask
         out[:,:,0] = np.bitwise_xor(out[:,:,0], np.bitwise_and(out[:,:,0], one_class_mask)) # =x ^ (x & y)
     return out
+
+
+def get_common_size(img1, img2):
+    return min(img1.shape[0], img2.shape[0]), min(img1.shape[1], img2.shape[1])

@@ -19,7 +19,7 @@ def sieve(image, size):
     lin_limit = size*4
 
     out_image = image.copy()
-    contours, hierarchy = cv2.findContours(image.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    image, contours, hierarchy = cv2.findContours(image.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     if len(hierarchy) > 0:
         hierarchy = hierarchy[0]
         index = 0
@@ -35,3 +35,18 @@ def sieve(image, size):
 
     return out_image
 
+
+def normalize(img):
+    assert len(img.shape) == 2, "Image should have one channel"
+    out = img.astype(np.float32)
+    mins = out.min()
+    maxs = out.max() - mins
+    return (out - mins) / (maxs + 0.00001)
+
+
+def binarize(img, threshold=0.1, size=10, iters=1):
+    img = normalize(img)
+    res = (img > threshold).astype(np.uint8)    
+    res = sieve(res, size)
+    res = cv2.morphologyEx(res, cv2.MORPH_CLOSE, np.ones((3,3), dtype=np.uint8), iterations=iters)
+    return res
