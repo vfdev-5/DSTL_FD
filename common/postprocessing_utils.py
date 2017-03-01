@@ -47,6 +47,7 @@ def normalize(img):
 
 def binarize(img, threshold_low=0.0, threshold_high=1.0, size=10, iters=1):
     res = ((img >= threshold_low) & (img <= threshold_high)).astype(np.uint8)
-    res = sieve(res, size)
-    res = cv2.morphologyEx(res, cv2.MORPH_CLOSE, np.ones((3, 3), dtype=np.uint8), iterations=iters)
+    #res = sieve(res, size)
+    #res = cv2.morphologyEx(res, cv2.MORPH_CLOSE, np.ones((3, 3), dtype=np.uint8), iterations=iters)
+    #res = cv2.morphologyEx(res, cv2.MORPH_DILATE, np.ones((3, 3), dtype=np.uint8), iterations=1)
     return res

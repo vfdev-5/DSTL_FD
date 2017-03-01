@@ -121,6 +121,33 @@ def create_pan_rad_inds_ms(image_id, sc_threshold=0.1, remove_generated_files=Fa
     return x
 
 
+def _relu(x):
+    x = x.copy()
+    x[x < 0] = 0
+    return x
+
+
+def water_index_ms(image_id, image_type_ms='ms'):
+    img_ms = get_image_data(image_id, image_type_ms).astype(np.float32)
+    # image with water as positive values
+    a = img_ms[:,:,0].astype(np.float32) - img_ms[:,:,7].astype(np.float32)
+    b = img_ms[:,:,1].astype(np.float32) - img_ms[:,:,6].astype(np.float32)
+    # enchance positive values with _relu non-linearity
+    c = np.sqrt(_relu(a) * _relu(b)) /( a + b + 0.0001)
+    return c - np.mean(c)
+
+
+def water_index_2_ms(image_id, image_type_ms='ms'):
+    img_ms = get_image_data(image_id, image_type_ms).astype(np.float32)
+    # enchance black pixels from NIR1, NIR2 -> water/buildings are black
+    a = np.sqrt(img_ms[:,:,7].astype(np.float32) * img_ms[:,:,6].astype(np.float32))
+    # divide by the red band -> buildings are less black
+    b = a / (img_ms[:,:,5].astype(np.float32) + 0.0001)
+    # inverse colors
+    c = 1.0 / (b + 0.0001)
+    return c - np.mean(c)
+
+
 def _CCCI_index(img_ms, img_rgb):
     RE = img_ms[:,:,5]#.astype(np.float32)
     MIR = img_ms[:,:,7]#.astype(np.float32)
@@ -148,3 +175,12 @@ def CCCI_index(image_id, good=False):
         return _CCCI_index2(img_ms[:h, :w, :], img_rgb[:h, :w, :])
     return _CCCI_index(img_ms[:h, :w, :], img_rgb[:h, :w, :])
 
+
+def CCCI_index_ms(image_id, image_type_ms='ms'):
+    img_ms = get_image_data(image_id, image_type_ms)
+    h = img_ms.shape[0]
+    w = img_ms.shape[1]
+    RE  = img_ms[:,:,5]
+    MIR = img_ms[:,:,7]
+    R = img_ms[:,:,4]
+    return (MIR-RE)/(MIR+RE)*(MIR-R)/(MIR+R)

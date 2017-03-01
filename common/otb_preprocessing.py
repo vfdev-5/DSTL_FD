@@ -11,9 +11,11 @@ from image_utils import get_filename
 
 # Configure the OTB path (folder with bin, lib, share)
 import yaml
-assert os.path.exists('../common/otb_conf.yaml'), \
+
+otb_conf_file = os.path.abspath(os.path.join(os.path.dirname(__file__), "otb_conf.yaml"))
+assert os.path.exists(otb_conf_file), \
     "OTB configuration file is not found. Modify and rename otb_conf.yaml.example to otb_conf.yaml"
-with open('../common/otb_conf.yaml', 'r') as f:
+with open(otb_conf_file, 'r') as f:
     cfg = yaml.load(f)
     assert "OTB_PATH" in cfg, "otb_conf.yaml does not contain OTB_PATH"
     OTB_PATH = cfg['OTB_PATH']
