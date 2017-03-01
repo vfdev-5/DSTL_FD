@@ -18,11 +18,11 @@ with open('../common/otb_conf.yaml', 'r') as f:
     assert "OTB_PATH" in cfg, "otb_conf.yaml does not contain OTB_PATH"
     OTB_PATH = cfg['OTB_PATH']
 
-
 assert os.path.exists(os.path.join(OTB_PATH, 'lib', 'python', 'otbApplication.py')), "Orfeo-ToolBox is not found"
 os.environ['PATH'] += os.pathsep + os.path.join(OTB_PATH, 'bin')
 os.environ['OTB_APPLICATION_PATH'] = os.path.join(OTB_PATH, 'lib', 'otb', 'applications')
 sys.path.append(os.path.join(OTB_PATH, 'lib', 'python'))
+sys.path.append(os.path.join(OTB_PATH, 'lib'))
 
 
 def generate_rm_indices(image_id):
@@ -75,9 +75,10 @@ def generate_rm_indices(image_id):
 
     
 try:
-    import otbApplication    
 
     import numpy as np
+    import otbApplication
+
     from image_utils import get_image_data  
 
     # The following line creates an instance of the RadiometricIndices application
@@ -113,7 +114,9 @@ try:
         'ndti': 'Water:NDTI',
         'mndwi': 'Water:MNDWI',
         'bi': 'Soil:BI',
-        'bi2': 'Soil:BI2'    
+        'bi2': 'Soil:BI2',
+        'ri': 'Soil:RI',
+        'ci': 'Soil:CI'
     }
     _channels = ['red', 'green', 'blue', 'nir', 'mir']    
 
@@ -144,18 +147,9 @@ try:
         h, w = (0, 0)
         imgs = {}
         for image_type in image_types:
-            if image_type == 'ms':
-                imgs[image_type] = get_image_data(image_id, image_type + '_pan')
-                h = max(h, imgs[image_type].shape[0])
-                w = max(w, imgs[image_type].shape[1])
-            elif image_type == '3b':
-                imgs[image_type] = get_image_data(image_id, image_type)
-                h = max(h, imgs[image_type].shape[0])
-                w = max(w, imgs[image_type].shape[1])        
-            elif image_type == 'swir':
-                imgs[image_type] = get_image_data(image_id, image_type + '_aligned_upsampled')
-                h = max(h, imgs[image_type].shape[0])
-                w = max(w, imgs[image_type].shape[1])        
+            imgs[image_type] = get_image_data(image_id, image_type)
+            h = max(h, imgs[image_type].shape[0])
+            w = max(w, imgs[image_type].shape[1])
 
         # ndarray composed of red, green, blue, nir, mir        
         in_array = np.zeros((h, w, 5), dtype=np.uint16)

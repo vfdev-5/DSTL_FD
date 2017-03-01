@@ -122,7 +122,7 @@ def create_pan_rad_inds_ms(image_id, sc_threshold=0.1, remove_generated_files=Fa
 
 
 def _CCCI_index(img_ms, img_rgb):
-    RE  = img_ms[:,:,5]#.astype(np.float32)
+    RE = img_ms[:,:,5]#.astype(np.float32)
     MIR = img_ms[:,:,7]#.astype(np.float32)
     R = img_rgb[:,:,0]#.astype(np.float32)
     # canopy chloropyll content index

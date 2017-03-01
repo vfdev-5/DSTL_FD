@@ -11,7 +11,6 @@ from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.normalization import BatchNormalization
 
 
-
 def unet(n_classes, n_channels, input_width, input_height, bn_mode=2, use_deconv=False):
     """
         Network U-Net

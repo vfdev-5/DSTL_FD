@@ -4,6 +4,7 @@
 #
 import numpy as np
 import cv2
+from scipy.ndimage.filters import median_filter
 
 
 def sieve(image, size):
@@ -20,7 +21,7 @@ def sieve(image, size):
 
     out_image = image.copy()
     image, contours, hierarchy = cv2.findContours(image.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    if len(hierarchy) > 0:
+    if hierarchy is not None and len(hierarchy) > 0:
         hierarchy = hierarchy[0]
         index = 0
         while index >= 0:
@@ -44,9 +45,8 @@ def normalize(img):
     return (out - mins) / (maxs + 0.00001)
 
 
-def binarize(img, threshold=0.1, size=10, iters=1):
-    img = normalize(img)
-    res = (img > threshold).astype(np.uint8)    
+def binarize(img, threshold_low=0.0, threshold_high=1.0, size=10, iters=1):
+    res = ((img >= threshold_low) & (img <= threshold_high)).astype(np.uint8)
     res = sieve(res, size)
-    res = cv2.morphologyEx(res, cv2.MORPH_CLOSE, np.ones((3,3), dtype=np.uint8), iterations=iters)
+    res = cv2.morphologyEx(res, cv2.MORPH_CLOSE, np.ones((3, 3), dtype=np.uint8), iterations=iters)
     return res
