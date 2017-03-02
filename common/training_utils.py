@@ -46,7 +46,7 @@ def tile_iterator(image_ids_to_use,
 
     """
     gb = TRAIN_WKT[~TRAIN_WKT['MultipolygonWKT'].str.contains("EMPTY")].groupby('ClassType')
-    overlapping = int(min(tile_size[0], tile_size[1]) * 0.25)
+    overlapping = int(min(tile_size[0], tile_size[1]) * 0.75)
 
     total_n_pixels = np.array([0] * len(classes))
     apply_random_transformation = (len(random_rotation_angles) > 0 or len(random_scales) > 0)
@@ -133,13 +133,14 @@ def tile_iterator(image_ids_to_use,
                         select_bands = None if len(channels) == gimg_input.shape[2] else channels.tolist()
                         tile_input = gimg_input.get_data(extent, *tile_size, select_bands=select_bands).astype(np.float32)
                         
-                        #print "- np.isinf(tile_input).any()", np.isinf(tile_input).any(), tile_input.min(), tile_input.max(), tile_input.shape, tile_input.dtype
+                        # print "- np.isinf(tile_input).any()", np.isinf(tile_input).any(), tile_input.min(), tile_input.max(), tile_input.shape, tile_input.dtype
                         if mean_image is not None and std_image is not None:
+                            # print "Extract from mean_image: ", xoffset_label, yoffset_label, tile_size_s[0], tile_size_s[1], mean_image.shape
                             mean_tile_image = mean_image[yoffset_label:yoffset_label + tile_size_s[1],
                                               xoffset_label:xoffset_label + tile_size_s[0], :]
                             std_tile_image = std_image[yoffset_label:yoffset_label + tile_size_s[1],
                                              xoffset_label:xoffset_label + tile_size_s[0], :]
-                            #print "mean_tile_image.shape, std_tile_image.shape : ", mean_tile_image.shape, std_tile_image.shape
+                            # print "mean_tile_image.shape, std_tile_image.shape : ", mean_tile_image.shape, std_tile_image.shape
                             if scale > 1:
                                 mean_tile_image = cv2.resize(mean_tile_image, dsize=tile_size, interpolation=cv2.INTER_LINEAR)
                                 std_tile_image = cv2.resize(std_tile_image, dsize=tile_size, interpolation=cv2.INTER_LINEAR)
@@ -151,8 +152,8 @@ def tile_iterator(image_ids_to_use,
                         if apply_random_transformation:
                             sc = random_scales[np.random.randint(len(random_scales))] if len(random_scales) > 0 else 1.0
                             a = random_rotation_angles[np.random.randint(len(random_rotation_angles))] if len(random_rotation_angles) > 0 else 0.0
-                            if a != 0 and sc < 1.15:
-                                sc = 1.15
+                            if a != 0 and sc < 1.2:
+                                sc = 1.2
                             if np.abs(a) > 0.0:
                                 warp_matrix = cv2.getRotationMatrix2D((tile_size[0] / 2, tile_size[1] / 2), a, sc)
                                 h, w, _ = tile_input.shape

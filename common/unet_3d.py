@@ -22,7 +22,7 @@ def conv(input_layer, n_filters_0=16, deep=False, l=0.01, size=3):
     return x
 
 
-def unet_downsample(input_layer, n_levels=3, n_filters_0, deep):
+def unet_downsample(input_layer, n_filters_0, deep, n_levels=3):
     """
     x -> [conv(x), conv^2(x))/2, conv^3(x))/4, conv^4(x))/8]
     """
@@ -55,8 +55,9 @@ def unet_upsample(inputs, n_filters_0, deep):
     [x1, x2, x3, x4, x5] -> conv([conv([conv([conv([x5*2, x4])*2, x3])*2, x2])*2, x1])
                 
     """
-    n_levels=len(inputs) - 1
+    n_levels = len(inputs) - 1
     assert 0 < n_levels < 4, "Number of inputs should be 2, 3, 4"
+
     def _upsample_merge(_x1, _x2):
         _x = UpSampling3D(size=(2, 2, 2))(_x2)
         _x = merge([_x, _x1], mode='concat', concat_axis=1)

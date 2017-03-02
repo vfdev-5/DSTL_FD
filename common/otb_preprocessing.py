@@ -86,7 +86,8 @@ try:
     # The following line creates an instance of the RadiometricIndices application
     RadiometricIndices = otbApplication.Registry.CreateApplication("RadiometricIndices")
     assert RadiometricIndices is not None, "OTB application 'RadiometricIndices' is not found"
- 
+    RadiometricIndices.SetParameterInt("ram", 1024)
+
     # Vegetation:NDVI - Normalized difference vegetation index (Red, NIR) 
     # Vegetation:TNDVI - Transformed normalized difference vegetation index (Red, NIR) 
     # Vegetation:RVI - Ratio vegetation index (Red, NIR) 
@@ -127,8 +128,7 @@ try:
         """
         Method to compute radiometric indices from image with 5 bands: R, G, B, NIR, MIR            
         """
-        RadiometricIndices.SetVectorImageFromNumpyArray('in', image_5b)
-        RadiometricIndices.SetParameterInt("ram", 1024)
+        RadiometricIndices.SetVectorImageFromNumpyArray("in", image_5b)
         list_ch = [_out_channels_dict[c] for c in user_out_channels]
         RadiometricIndices.SetParameterStringList("list", list_ch)
         

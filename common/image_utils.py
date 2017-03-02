@@ -112,14 +112,17 @@ def get_image_data(image_id, image_type, return_shape_only=False):
     return img_data
 
 
-def imwrite(filename, data):
+def imwrite(filename, data, compress=True):
     driver = gdal.GetDriverByName("GTiff")
     data_type = to_gdal(data.dtype)
     nb_bands = data.shape[2]
     width = data.shape[1]
     height = data.shape[0]
 
-    dst_dataset = driver.Create(filename, width, height, nb_bands, data_type)
+    kwargs = {}
+    if compress:
+        kwargs['options'] = ['COMPRESS=LZW']
+    dst_dataset = driver.Create(filename, width, height, nb_bands, data_type, **kwargs)
     assert dst_dataset is not None, "File '%s' is not created" % filename
     for band_index in range(1,nb_bands+1):
         dst_band = dst_dataset.GetRasterBand(band_index)
@@ -489,8 +492,8 @@ def compute_mean_std_on_images(trainset_ids, image_type='input', feature_wise=Fa
         img_Kb = get_image_data(image_id, image_type).astype(np.float32)
         h, w, _ = img_Kb.shape
         if feature_wise:
-            mean_image[:h, :w, :] += np.mean(img_Kb, axis=(0, 1))
-            std_image[:h, :w, :] += np.std(img_Kb, axis=(0, 1))
+            mean_image[:, :, :] += np.mean(img_Kb, axis=(0, 1))
+            std_image[:, :, :] += np.std(img_Kb, axis=(0, 1))
         else:
             mean_image[:h, :w, :] += img_Kb
             std_image[:h, :w, :] += np.power(img_Kb, 2.0)

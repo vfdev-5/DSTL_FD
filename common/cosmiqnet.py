@@ -4,11 +4,11 @@
 
 from keras.models import Model
 from keras.layers.convolutional import Convolution2D, Deconvolution2D
-from keras.layers import Input, merge
+from keras.layers import Input, merge, Lambda
 from keras.layers.advanced_activations import LeakyReLU
 
 
-def cosmiqnet_zero(input_a_shape, input_b_shape, n_layers=5, n_filters=64, size=3, beta=0.9):
+def cosmiqnet_original(input_a_shape, input_b_shape, n_layers=5, n_filters=64, size=3, beta=0.9):
     """
     
     :param input_a_shape: shape of larger size input, (h1, w1, nc1)
@@ -38,6 +38,30 @@ def cosmiqnet_zero(input_a_shape, input_b_shape, n_layers=5, n_filters=64, size=
     return Model(input=[x_a, x_b], output=label_out)
 
 
+def cosmiqnet_zero(input_shape, output_n_channels, n_layers=5, n_filters=64, size=3, beta=0.9):
+    """
+    """
+    inputs = Input(shape=(input_shape[2],) + input_shape[:2])
+
+    # first layer
+    z_1 = Convolution2D(n_filters, size, size, border_mode="same")(inputs)
+    label_out = internal_block(z_1, n_filters, size)
+
+    # Loop
+    out_layers = [label_out,]
+    for i in range(1, n_layers):
+        z_i = Convolution2D(n_filters, size, size, border_mode="same")(inputs)
+        x = Convolution2D(n_filters, size, size, border_mode="same")(out_layers[i-1])
+        x = merge([x, z_i], mode='sum')
+        x = internal_block(x, n_filters, size)
+        label_out = beta_mix(x, out_layers[i-1], beta)
+        out_layers.append(label_out)
+
+    outputs = Convolution2D(output_n_channels, 1, 1, border_mode="same")(out_layers[-1])
+
+    return Model(input=inputs, output=outputs)
+
+
 def mix_block(x_a, x_b, n_filters, size, scale):
     z_a = Convolution2D(n_filters, size, size, subsample=(scale, scale), border_mode="same")(x_a)
     z_b = Convolution2D(n_filters, size, size, border_mode="same")(x_b)
@@ -53,11 +77,20 @@ def internal_block(x, n_filters, size):
 
 
 def beta_mix(x, y, beta):
-    return merge([x * beta, y * (1.0 - beta)], mode='sum')
+    # x = Lambda(lambda _x: beta * _x, output_shape=lambda input_shape: input_shape)(x)
+    # y = Lambda(lambda _y: (1.0 - beta) * _y, output_shape=lambda input_shape: input_shape)(y)
+    return merge([x, y], mode='sum')
+
+
+def conv_mix(x, y):
+    # x = Lambda(lambda _x: beta * _x, output_shape=lambda input_shape: input_shape)(x)
+    # y = Lambda(lambda _y: (1.0 - beta) * _y, output_shape=lambda input_shape: input_shape)(y)
+    xy = merge([x, y], mode='concat', concat_axis=1)
+    return Convolution2D(x._keras_shape[1], 1, 1, border_mode="same")(xy)
 
 
 
-# with tf.device(gpu):
+        # with tf.device(gpu):
 #     # Generator
 #     x8 = tf.placeholder(tf.float32, shape=[None, FLAGS.ws, FLAGS.ws, 8])
 #     x3 = tf.placeholder(tf.float32, shape=[None, scale * FLAGS.ws, scale * FLAGS.ws, 3])
@@ -101,4 +134,4 @@ def beta_mix(x, y, beta):
 #         else:
 #             outlayer[i] = tf.nn.relu(
 #                 tf.add(tf.scalar_mul(beta[i], labelout[i]), tf.scalar_mul(1.0 - beta[i], inlayer[i])))
-# label_cost[i] = tf.reduce_sum(tf.pow(tf.sub(outlayer[i], label_distance), 2))
+#         label_cost[i] = tf.reduce_sum(tf.pow(tf.sub(outlayer[i], label_distance), 2))
