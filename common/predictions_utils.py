@@ -13,7 +13,7 @@ from geo_utils.GeoImage import from_ndarray, GeoImage
 from training_utils import normalize_image
 
 
-def compute_predictions(image_id, model, channels=None, mean_image=None, std_image=None, batch_size=4, scale=1, out_size=(3500, 3500)):
+def compute_predictions(image_id, model, channels=None, image_type='input', tile_size = (256, 256), mean_image=None, std_image=None, batch_size=4, scale=1, out_size=(3500, 3500)):
     """
     Method to compute predictions using trained model
     :param image_id: input image id on which compute predictions
@@ -25,7 +25,7 @@ def compute_predictions(image_id, model, channels=None, mean_image=None, std_ima
     :return: ndarray with predictions
     """
     Y_predictions = np.zeros(out_size + (model.output_shape[1], ), dtype=np.float32)
-    tile_size = (256, 256)
+    
     overlapping = int(min(tile_size[0], tile_size[1]) * 0.25)
 
     if mean_image is not None and std_image is not None:
@@ -33,7 +33,7 @@ def compute_predictions(image_id, model, channels=None, mean_image=None, std_ima
             mean_image = mean_image[:, :, channels]
             std_image = std_image[:, :, channels]
 
-    image_filename = get_filename(image_id, 'input')
+    image_filename = get_filename(image_id, image_type)
     if not os.path.exists(image_filename):
         x = create_pan_rad_inds_ms(image_id, remove_generated_files=True)
         gimg = from_ndarray(x)

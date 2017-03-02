@@ -24,6 +24,10 @@ def jaccard_coef_int(y_true, y_pred):
 
 def score(y_true, y_pred):
     smooth = 1e-12
+    if len(y_true.shape) == 2: 
+        y_true = y_true[:,:,None]    
+    if len(y_pred.shape) == 2: 
+        y_pred = y_pred[:,:,None]        
     y_true = y_true.astype(np.float32)
     y_pred = y_pred.astype(np.float32)
     intersection = np.sum(y_true * y_pred, axis=(0, 1))

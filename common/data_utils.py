@@ -170,11 +170,12 @@ def get_filename(image_id, image_type):
     return os.path.join(data_path, "{}{}.{}".format(image_id, suffix, ext))
 
 
-def get_unit_polygons(image_id):
+def get_unit_polygons(image_id, classes=None):
     polygons = {}
     image_polygons = TRAIN_WKT[TRAIN_WKT['ImageId'] == image_id]
     assert not image_polygons.empty, "This is a test image"
-    for class_type in range(1,len(LABELS)):
+    classes = list(range(1,len(LABELS))) if classes is None else classes
+    for class_type in classes:
         polygons[class_type] = loads(image_polygons[image_polygons['ClassType'] == class_type].MultipolygonWKT.values[0])
     return polygons
 
@@ -193,8 +194,8 @@ def get_scalers(image_id, image_height, image_width):
     return w_ / x_max, h_ / y_min
 
 
-def get_resized_polygons(image_id, image_height, image_width):
-    polygons = get_unit_polygons(image_id)
+def get_resized_polygons(image_id, image_height, image_width, classes=None):
+    polygons = get_unit_polygons(image_id, classes)
     x_scaler, y_scaler = get_scalers(image_id, image_height, image_width)
     resized_polygons = {}
     for class_type in polygons:
