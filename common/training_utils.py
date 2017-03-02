@@ -28,7 +28,7 @@ def tile_iterator(image_ids_to_use,
                   tile_size=(256, 256),
                   mean_image=None,
                   std_image=None,
-                  random_rotation_angles=(0.0, 5.0, 0.0, -5.0, 0.0, 15.0, 0.0, -15.0),
+                  random_rotation_angles=(0.0, 5.0, -5.0, 15.0, -15.0, 90.0, -90.0, 0.0),
                   random_scales=(),
                   resolution_levels=(1,),
                   n_images_same_time=5,
@@ -117,6 +117,8 @@ def tile_iterator(image_ids_to_use,
                                if old_argmax == new_argmax:
                                    continue
                             total_n_pixels += class_freq
+                            if verbose_image_ids:
+                                print "total_n_pixels:", total_n_pixels
 
                         if label_type == 'label':
                             tile_label = tile_label[:, :, classes]
@@ -152,7 +154,7 @@ def tile_iterator(image_ids_to_use,
                         if apply_random_transformation:
                             sc = random_scales[np.random.randint(len(random_scales))] if len(random_scales) > 0 else 1.0
                             a = random_rotation_angles[np.random.randint(len(random_rotation_angles))] if len(random_rotation_angles) > 0 else 0.0
-                            if a != 0 and sc < 1.2:
+                            if 0 < np.abs(a) < 90 and sc < 1.2:
                                 sc = 1.2
                             if np.abs(a) > 0.0:
                                 warp_matrix = cv2.getRotationMatrix2D((tile_size[0] / 2, tile_size[1] / 2), a, sc)
