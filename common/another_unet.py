@@ -167,9 +167,20 @@ def termination(input_layer, n_classes):
 
 
 def termination_3d(input_layer, n_classes):
-    x = Activation("relu")(input_layer)
+    x = Activation("elu")(input_layer)
     x = UpSampling3D(size=(2, 2, 2))(x)
-    x = Convolution3D(n_classes, 3, 3, 3, name="last_conv", border_mode="same")(x)
+    
+    # th ordering : (None, f, nc, h, w) -> (None, f*nc, h, w)
+    new_shape = x._keras_shape
+    n_filters = new_shape[1]*new_shape[2]
+    new_shape = (n_filters, ) + new_shape[3:]
+    x = Reshape(new_shape)(x)
+    nb_conv = int(np.floor(np.log(n_filters) / np.log(2)))
+    for i in range(nb_conv):
+        x = Convolution2D(n_filters / 2**i, 3, 3, border_mode="same")(x)
+        x = Activation("elu")(x)
+
+    x = Convolution2D(n_classes, 3, 3, name="last_conv", border_mode="same")(x)
     output_layer = Activation("sigmoid")(x)
     return output_layer
 
