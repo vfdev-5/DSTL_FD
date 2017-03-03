@@ -55,8 +55,8 @@ def create_submission():
         else:
             labels_image = get_image_data(image_id, 'label')
             x_scaler, y_scaler = get_scalers(image_id, labels_image.shape[0], labels_image.shape[1])
-            for class_index, _ in enumerate(LABELS[1:]):
-                polygons = mask_to_polygons(labels_image[:, :, class_index])
+            for class_index, _ in enumerate(LABELS[1:]): ## !!! for class_index in range(1, len(LABELS[1:])):
+                polygons = mask_to_polygons(labels_image[:, :, class_index]) ## !!! CHECK if class_index = 0 is NONE or Buildings 
                 if len(polygons) == 0:
                     out_df.loc[ll * index + class_index, :] = [image_id, str(class_index + 1), empty_polygon]
                 else:

@@ -21,6 +21,7 @@ def sieve(image, size):
 
     out_image = image.copy()
     image, contours, hierarchy = cv2.findContours(image.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    
     if hierarchy is not None and len(hierarchy) > 0:
         hierarchy = hierarchy[0]
         index = 0

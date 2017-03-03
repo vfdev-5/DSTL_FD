@@ -118,8 +118,8 @@ def display_labels(label_img, roi=None, ax_array=None, show_legend=True, **kwarg
                   fontsize='x-small',
                   title='Objects:',
                   framealpha=0.3)
+    
 
-#
 # Buggy method to plot polygons. No internal polygons drawn
 #
 # def display_polygons(polygons, roi=None, ax_array=None, show_legend=True):

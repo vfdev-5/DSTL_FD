@@ -548,9 +548,8 @@ def generate_label_image(image_id, image_type='pan', labels=None):
 def generate_label_image2(image_id, image_type='pan'):
 
     image_shape = get_image_data(image_id, image_type, return_shape_only=True)
-    rpolygons = get_resized_polygons(image_id, *image_shape[:2])
-    out_size = get_image_data(image_id, image_type, return_shape_only=True)
-    out = np.zeros(out_size[:2] + (len(LABELS), ), np.uint8)
+    rpolygons = get_resized_polygons(image_id, *image_shape[:2])    
+    out = np.zeros(image_shape[:2] + (len(LABELS), ), np.uint8)
     out[:,:,0] = 1
     round_coords = lambda x: np.array(x).round().astype(np.int32)
     for class_type in range(1, len(LABELS)):
