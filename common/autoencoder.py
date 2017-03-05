@@ -1,7 +1,12 @@
 
+#
+#
+#
+
 from keras.layers import ZeroPadding2D, Convolution2D, MaxPooling2D, Input, UpSampling2D, BatchNormalization, Reshape, Activation, Dropout
 from keras.models import Model
 from keras.regularizers import l2
+
 
 def create_encoding_layers(kernel=3, filter_size=64, pad=1, pool_size=2):
     return [
@@ -65,10 +70,8 @@ def autoencoder_zero(n_classes, n_channels, input_width, input_height, n_filters
     for layer in decoding_layers:
         x = layer(x)
 
-    x = Convolution2D(n_classes, 1, 1, border_mode='valid',)(x)
-    x = Reshape((n_classes, input_height * input_width))(x)
-    x = Activation('softmax')(x)
-    outputs = Reshape((n_classes, input_height, input_width))(x)
+    x = Convolution2D(n_classes, 1, 1, border_mode='valid')(x)
+    outputs = Activation('sigmoid')(x)
 
     model = Model(input=inputs, output=outputs)
     return model
@@ -90,7 +93,7 @@ def autoencoder_QBI(n_classes, n_channels, input_width, input_height, n_filters_
     x = Dropout(0.25)(x)
     x = MaxPooling2D(pool_size=(2, 2), border_mode='same')(x)
 
-    x = Convolution2D(n_classes, 1, 1, border_mode='same', W_regularizer = l2(l=0.05))(x)
+    x = Convolution2D(n_classes, 1, 1, border_mode='same', W_regularizer=l2(l=0.05))(x)
 
     x = UpSampling2D(size=(2,2))(x)
     x = UpSampling2D(size=(2,2))(x)

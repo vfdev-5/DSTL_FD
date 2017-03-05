@@ -12,5 +12,5 @@ def score(y_true, y_pred):
     y_pred = y_pred.astype(np.float32)
     intersection = np.sum(y_true * y_pred, axis=(0, 1))
     sum_ = np.sum(y_true + y_pred, axis=(0, 1))
-    jac = (intersection + smooth) / (sum_ - intersection + smooth)
+    jac = (intersection + smooth * 0.0001) / (sum_ - intersection + smooth)
     return np.mean(jac)

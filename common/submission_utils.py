@@ -101,21 +101,36 @@ def write_shp_from_polygons(filename, image_id, all_scaled_polygons):
         'properties': {'image_id': 'str', 'class': 'int'},
     }
     with fiona.open(filename, 'w', 'ESRI Shapefile', schema) as c:
-        for k in all_scaled_polygons:
-            polygons = all_scaled_polygons[k]
+
+        def _write_poly(polygons, image_id, k):
             # To align with images in QGis
             polygons = scale(polygons, xfact=1.0, yfact=-1.0, origin=(0, 0, 0))
             c.write({
                 'geometry': mapping(polygons),
                 'properties': {'image_id': image_id, 'class': k},
             })
+
+        for k in all_scaled_polygons:
+            polygons = all_scaled_polygons[k]
+            if isinstance(polygons, list):
+                for p in polygons:
+                    _write_poly(p, image_id, k)
+            else:
+                _write_poly(polygons, image_id, k)
     print "Written succesfully file : ", filename
 
 
-def get_data_csv(image_id, csv_file):
-    for data_csv in submission_iterator(csv_file):
+def get_data_csv(image_id, csv_filename):
+    for data_csv in submission_iterator(csv_filename):
         if image_id == data_csv[0][0]:
             return data_csv
+
+
+def get_image_ids(csv_filename):
+    out = []
+    for data_csv in submission_iterator(csv_filename):
+        out.append(data_csv[0][0])
+    return out
 
 
 def compute_label_image(image_id, scaled_polygons, image_type='3b'):
@@ -262,3 +277,4 @@ def rewrite_submission2(input_csv_filename, output_csv_file, postproc_function):
         pass
 
     f_out.close()
+

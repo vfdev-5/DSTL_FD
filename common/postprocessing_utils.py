@@ -136,7 +136,15 @@ def trees_postprocessing(bin_img):
 
 
 def buildings_postprocessing(bin_img):
-    pass
+    """
+    Mask post-processing for 'Trees' (label 5)
+
+    - Enlarge trees <-> Morpho close
+    """
+
+    bin_img = cv2.morphologyEx(bin_img, cv2.MORPH_CLOSE, kernel=np.ones((5, 5), dtype=np.uint8), iterations=1)
+    return bin_img
+
 
 
 def mask_postprocessing(labels_image, class_pp_func_list):
