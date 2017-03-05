@@ -527,14 +527,13 @@ def generate_label_image(image_id, image_type='pan', labels=None):
 
     image_shape = get_image_data(image_id, image_type, return_shape_only=True)
     rpolygons = get_resized_polygons(image_id, *image_shape[:2])
-    out_size = get_image_data(image_id, image_type, return_shape_only=True)
-    out = np.zeros(out_size[:2], np.uint8)
+    out = np.zeros(image_shape[:2], np.uint8)
     round_coords = lambda x: np.array(x).round().astype(np.int32)
     label_ids = ORDERED_LABEL_IDS if labels is None else [i for i in ORDERED_LABEL_IDS if i in labels]
     for i, class_type in enumerate(label_ids):
         if class_type not in rpolygons:
             continue
-        one_class_mask = np.zeros(out_size[:2], np.uint8)
+        one_class_mask = np.zeros(out.shape[:2], np.uint8)
         for polygon in rpolygons[class_type]:
             exterior = [round_coords(polygon.exterior.coords)]
             cv2.fillPoly(one_class_mask, exterior, i)
@@ -555,7 +554,7 @@ def generate_label_image2(image_id, image_type='pan'):
     for class_type in range(1, len(LABELS)):
         if class_type not in rpolygons:
             continue
-        one_class_mask = np.zeros(out_size[:2], np.uint8)
+        one_class_mask = np.zeros(out.shape[:2], np.uint8)
         for polygon in rpolygons[class_type]:
             exterior = [round_coords(polygon.exterior.coords)]
             cv2.fillPoly(one_class_mask, exterior, 1)

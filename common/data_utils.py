@@ -222,7 +222,11 @@ def mask_to_polygons(mask, epsilon=5, min_area=1.):
         ((mask == 1) * 255).astype(np.uint8),
         cv2.RETR_CCOMP, cv2.CHAIN_APPROX_TC89_KCOS)
     # create approximate contours to have reasonable submission size
-    approx_contours = [cv2.approxPolyDP(cnt, epsilon, True) for cnt in contours]
+    if epsilon > 0:
+        approx_contours = [cv2.approxPolyDP(cnt, epsilon, True) for cnt in contours]
+    else:
+        approx_contours = contours
+
     if not contours:
         return MultiPolygon()
     # now messy stuff to associate parent and child contours

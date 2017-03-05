@@ -2,7 +2,7 @@
 
 ## Custom ignores
 input/
-results/*.csv
+results/*
 *.lmdb
 *.binproto
 *.caffemodel

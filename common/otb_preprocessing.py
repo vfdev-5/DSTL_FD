@@ -7,10 +7,11 @@ import os
 import sys
 import subprocess
 import logging
-from image_utils import get_filename
+# from image_utils import get_filename
 
 # Configure the OTB path (folder with bin, lib, share)
 import yaml
+
 
 otb_conf_file = os.path.abspath(os.path.join(os.path.dirname(__file__), "otb_conf.yaml"))
 assert os.path.exists(otb_conf_file), \
@@ -72,7 +73,7 @@ def generate_rm_indices(image_id):
     err = p.stderr.readlines()
     if len(err) > 0:
         logging.error("RadiometricIndices failed with error : %s" % err)
-        print err
+        print(err)
     p.wait()
 
     
@@ -163,9 +164,7 @@ try:
            
         return compute_rm_indices(in_array, user_out_channels)
 
-except:
-    print "OTB python wrapper is not available"
-    
-    
-    
+except Exception as e:
+    print("OTB python wrapper is not available. Error : %s" % e.message)
+
         

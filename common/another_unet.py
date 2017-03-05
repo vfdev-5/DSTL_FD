@@ -11,26 +11,26 @@ from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.normalization import BatchNormalization
 
 
-def unet_zero(n_classes, n_channels, input_width, input_height, bn_mode=2, use_deconv=False):
-    nb_filters = 64
-    bn_axis = 1    
-    inputs = Input(shape=(n_channels, input_height, input_width))
-
-    # 3D convolution starter:
-    x = starting_3d(inputs, nb_filters, bn_mode, bn_axis)    
-
-    # Encoder:
-    _, input_height, input_width = x._keras_shape[1:] # th ordering
-    min_s = min(input_width, input_height)
-    nb_conv = int(np.floor(np.log(min_s) / np.log(2)))
-    list_encoder, list_nb_filters = encoder(x, nb_conv, nb_filters, bn_mode, bn_axis)
-    
-    #Decoder:
-    list_decoder, list_nb_filters = decoder(list_encoder, list_nb_filters, nb_filters, bn_mode, bn_axis, use_deconv)
-
-    # Termination:
-    outputs = termination(list_decoder[-1], n_classes)
-    return Model(input=inputs, output=outputs, name="U-net zero")
+# def unet_zero(n_classes, n_channels, input_width, input_height, bn_mode=2, use_deconv=False):
+#     nb_filters = 64
+#     bn_axis = 1
+#     inputs = Input(shape=(n_channels, input_height, input_width))
+#
+#     # 3D convolution starter:
+#     x = starting_3d(inputs, nb_filters, bn_mode, bn_axis)
+#
+#     # Encoder:
+#     _, input_height, input_width = x._keras_shape[1:] # th ordering
+#     min_s = min(input_width, input_height)
+#     nb_conv = int(np.floor(np.log(min_s) / np.log(2)))
+#     list_encoder, list_nb_filters = encoder(x, nb_conv, nb_filters, bn_mode, bn_axis)
+#
+#     #Decoder:
+#     list_decoder, list_nb_filters = decoder(list_encoder, list_nb_filters, nb_filters, bn_mode, bn_axis, use_deconv)
+#
+#     # Termination:
+#     outputs = termination(list_decoder[-1], n_classes)
+#     return Model(input=inputs, output=outputs, name="U-net zero")
 
 
 def unet_original(n_classes, n_channels, input_width, input_height, bn_mode=2, use_deconv=False):
@@ -175,7 +175,7 @@ def termination_3d(input_layer, n_classes):
     n_filters = new_shape[1]*new_shape[2]
     new_shape = (n_filters, ) + new_shape[3:]
     x = Reshape(new_shape)(x)
-    nb_conv = int(np.floor(np.log(n_filters) / np.log(2)))
+    nb_conv = 3
     for i in range(nb_conv):
         x = Convolution2D(n_filters / 2**i, 3, 3, border_mode="same")(x)
         x = Activation("elu")(x)
