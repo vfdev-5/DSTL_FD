@@ -10,7 +10,7 @@ sys.path.append("../common/")
 from data_utils import LABELS
 
 
-def sieve(image, size):
+def sieve(image, size=None, compactness=None, use_convex_hull=False):
     """
     Filter removes small objects of 'size' from binary image
     Input image should be a single band image of type np.uint8
@@ -18,9 +18,11 @@ def sieve(image, size):
     Idea : use Opencv findContours
     """
     assert image.dtype == np.uint8, "Input should be a Numpy array of type np.uint8"
+    assert size is not None or compactness is not None, "Either size or compactness should be defined"
 
-    sq_limit = size**2
-    lin_limit = size*4
+    if size is not None:
+        sq_limit = size**2
+        lin_limit = size*4
 
     out_image = image.copy()
     image, contours, hierarchy = cv2.findContours(image.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
@@ -30,11 +32,18 @@ def sieve(image, size):
         index = 0
         while index >= 0:
             contour = contours[index]
+
+            if use_convex_hull:
+                contour = cv2.convexHull(contour)
             p = cv2.arcLength(contour, True)
             s = cv2.contourArea(contour)
             r = cv2.boundingRect(contour)
-            if s <= sq_limit and p <= lin_limit:
-                out_image[r[1]:r[1]+r[3],r[0]:r[0]+r[2]] = 0
+            if size is not None:
+                if s <= sq_limit and p <= lin_limit:
+                    out_image[r[1]:r[1]+r[3],r[0]:r[0]+r[2]] = 0
+            if compactness is not None:
+                if np.sign(compactness) * 4.0 * np.pi * s / p ** 2 > np.abs(compactness):
+                    out_image[r[1]:r[1] + r[3], r[0]:r[0] + r[2]] = 0
             # choose next contour of the same hierarchy
             index = hierarchy[index][0]
 
@@ -89,23 +98,14 @@ def crop_postprocessing(bin_img):
     return x
 
 
-# def trees_postprocessing(bin_img):
-#     """
-#     Mask post-processing for 'Trees'
+def roads_postprocessing(bin_img):
+    """
+    Mask post-processing for 'Roads' (label ")
 
-#     - Smooth forms <-> Smooth countours with median filter
-#     - No small holes <-> Remove small non-detections with sieve, linear size < 10 pixels
-
-#     """
-#     bin_img = cv2.medianBlur(bin_img, ksize=3)
-#     bin_img = (bin_img > 0.55).astype(np.uint8)
-
-#     bin_img = (bin_img < 0.5).astype(np.uint8)
-#     h, w = bin_img.shape
-#     bin_img[1:h-1, 1:w-1] = sieve(bin_img[1:h-1, 1:w-1], 10)
-#     bin_img = (bin_img < 0.5).astype(np.uint8)
-
-#     return bin_img
+    - Remove non linear formes <-> 4 * pi * surface / perimeter^2 < 0.25
+    """
+    bin_img = sieve(bin_img, compactness=0.25, use_convex_hull=False)
+    return bin_img
 
 
 def path_postprocessing(bin_img):
@@ -121,7 +121,6 @@ def path_postprocessing(bin_img):
     bin_img = cv2.medianBlur(bin_img, ksize=3)
     bin_img = (bin_img > 0.55).astype(np.uint8)
 
-    # lines = cv2.HoughLinesP()
     return bin_img
 
 
@@ -144,7 +143,6 @@ def buildings_postprocessing(bin_img):
 
     bin_img = cv2.morphologyEx(bin_img, cv2.MORPH_CLOSE, kernel=np.ones((5, 5), dtype=np.uint8), iterations=1)
     return bin_img
-
 
 
 def mask_postprocessing(labels_image, class_pp_func_list):

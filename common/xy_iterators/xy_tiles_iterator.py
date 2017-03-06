@@ -77,7 +77,7 @@ def tile_iterator(image_ids, X_adapter, Y_adapter, **params):
 
                         X = X_batch[Y_tiles_index]
                         extent = [xoffset, yoffset, tile_size[0], tile_size[1]]
-                        X_tile = X.get_data(extent, *tile_size)
+                        X_tile = X.get_data(extent, *tile_size).astype(np.float32)
 
                         if verbose > 2:
                             print("DEBUG 2: X_tile: ", X_tile.shape, X_tile.dtype)

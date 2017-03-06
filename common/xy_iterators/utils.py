@@ -116,7 +116,12 @@ def random_rotations(X, Y, angles=(15.0, -15.0, 90.0, -90.0), verbose=0):
     return X, Y
 
 
-def random_noise(X, Y, mean=0.0, std=0.25):
-    X_noise = std*np.random.randn(*X.shape) + mean
+def random_noise(X, Y, mean=0.0, std=0.75):
+    shape = np.array(X.shape)
+    shape[:2] /= 8
+    X_noise = std*np.random.randn(*shape.tolist()) + mean
+    X_noise = cv2.resize(X_noise, dsize=(X.shape[1], X.shape[0]), interpolation=cv2.INTER_LINEAR)
+    if len(X_noise.shape) == 2:
+        X_noise = np.expand_dims(X_noise, 2)
     X += X_noise
     return X, Y

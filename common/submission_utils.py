@@ -225,7 +225,7 @@ def rewrite_submission(input_csv_filename, output_csv_file, postproc_single_clas
                             interiors = [round_coords(poly.coords) for poly in polygon.interiors]
                             cv2.fillPoly(one_class_mask, interiors, 0)
                     pp_one_class_mask = postproc_single_class_functions[class_index](one_class_mask)
-                    polygons = mask_to_polygons(pp_one_class_mask, epsilon=0.0, min_area=0.1)
+                    polygons = mask_to_polygons(pp_one_class_mask, epsilon=1.0, min_area=0.1)
                     if len(polygons) == 0:
                         line = ",".join([image_id, str(class_index), empty_polygon]) + "\r\n"
                         f_out.write(line)
