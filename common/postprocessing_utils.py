@@ -2,8 +2,12 @@
 #
 # Helper method to perform a post-processing on predicted data
 #
+import cPickle
+
 import numpy as np
 import cv2
+
+from shapely.geometry import MultiPolygon
 
 import sys
 sys.path.append("../common/")
@@ -66,7 +70,7 @@ def binarize(img, threshold_low=0.0, threshold_high=1.0, size=10, iters=1):
     return res
 
 
-def crop_postprocessing(bin_img):
+def crop_postprocessing(bin_img, **kwargs):
     """
     Mask post-processing for 'Crops'
 
@@ -98,9 +102,9 @@ def crop_postprocessing(bin_img):
     return x
 
 
-def roads_postprocessing(bin_img):
+def roads_postprocessing(bin_img, **kwargs):
     """
-    Mask post-processing for 'Roads' (label ")
+    Mask post-processing for 'Roads' (label 3")
 
     - Remove non linear formes <-> 4 * pi * surface / perimeter^2 < 0.25
     """
@@ -108,7 +112,70 @@ def roads_postprocessing(bin_img):
     return bin_img
 
 
-def path_postprocessing(bin_img):
+# def pca(points, n_components=2):
+#     covar, mean = cv2.calcCovarMatrix(points, None, cv2.COVAR_SCALE | cv2.COVAR_ROWS | cv2.COVAR_SCRAMBLED)
+#     ret, e_vals, e_vecs = cv2.eigen(covar)
+#     # Conversion + normalisation required due to 'scrambled' mode
+#     e_vecs = cv2.gemm(e_vecs, points - mean, 1, None, 0)
+#     # apply_along_axis() slices 1D rows, but normalize() returns 4x1 vectors
+#     e_vecs = np.apply_along_axis(lambda n: cv2.normalize(n, None).flat, 1, e_vecs)
+#     return e_vecs[:n_components,:], e_vals[:n_components,:], mean
+
+
+round_coords = lambda x: np.array(x).round().astype(np.int32)
+
+
+def compute_features(p):
+    cnt = round_coords(p.exterior.coords)
+    defects = cv2.convexityDefects(cnt, cv2.convexHull(cnt, returnPoints=False))
+    p2 = p.convex_hull
+    ha = p2.area
+    hl = p2.length
+    dims = (p.length, p.area)
+    indices = (4.0 * np.pi * p.area / p.length ** 2, p.area/p.length)
+    indices2 = (ha/p.area,
+                p.length/hl,
+                p.area/hl,
+                ha/p.length,
+                p.area/hl**2,
+                ha/p.length**2,
+                ha - p.area,
+                p.length - hl)
+    moments = cv2.moments(cnt)
+    hu_moments = cv2.HuMoments(moments)
+    if defects is not None:
+        defs = (np.min(defects[:, 0, -1]), np.max(defects[:, 0, -1]), np.mean(defects[:, 0, -1]))
+    else:
+        defs = (0, 0, 0)
+    return dims + indices + indices2 + defs + tuple(hu_moments.ravel().tolist())
+
+
+with open('weights/roads_form_classifier', 'rb') as f:
+    roads_classifier = cPickle.load(f)
+
+
+def roads_shape_postprocessing(polygons, **kwargs):
+    """
+    Mask post-processing for 'Roads' (label 3")
+
+    - Remove non linear formes <->
+        a) Compactness index : 4 * pi * surface / perimeter^2 < 0.25
+        b) If surface > 1000
+    """
+    road_properties = []
+    for i, p in enumerate(polygons):
+        road_properties.append(compute_features(p))
+    road_properties = np.array(road_properties)
+    road_target_labels = roads_classifier.predict(road_properties)
+
+    new_polygons = []
+    for i, p in enumerate(polygons):
+        if road_target_labels[i]:
+            new_polygons.append(p)
+    return MultiPolygon(new_polygons)
+
+
+def path_postprocessing(bin_img, **kwargs):
     """
     Mask post-processing for 'Path' (label 4)
 
@@ -124,7 +191,7 @@ def path_postprocessing(bin_img):
     return bin_img
 
 
-def trees_postprocessing(bin_img):
+def trees_postprocessing(bin_img, **kwargs):
     """
     Mask post-processing for 'Trees' (label 5)
 
@@ -134,14 +201,47 @@ def trees_postprocessing(bin_img):
     return bin_img
 
 
-def buildings_postprocessing(bin_img):
+def buildings_postprocessing(bin_img, **kwargs):
     """
-    Mask post-processing for 'Trees' (label 5)
+    Mask post-processing for 'Buildings' (label 1)
 
     - Enlarge trees <-> Morpho close
     """
 
     bin_img = cv2.morphologyEx(bin_img, cv2.MORPH_CLOSE, kernel=np.ones((5, 5), dtype=np.uint8), iterations=1)
+    return bin_img
+
+
+def buildings_shape_postprocessing(polygons, **kwargs):
+    """
+    Mask post-processing for 'Buildings' (label 1)
+
+    - Remove detections all of 6080
+    - Keep only detections of 6050_4_4, 6050_4_3
+    """
+    image_id = kwargs['image_id']
+    if image_id is not None:
+        if "6080" in image_id:
+            return MultiPolygon([])
+        elif "6050" in image_id and (image_id != "6050_4_4" and image_id !="6050_4_3"):
+            return MultiPolygon([])
+        else:
+            return polygons
+    return polygons
+
+
+def standing_water_postprocessing(bin_img, **kwargs):
+    """
+    Mask post-processing for 'Standing water' (label 8)
+
+    - Remove small detections <-> remove small objects with sieve, size < 30
+    - Enlarge trees <-> Morpho dilate
+    - Smooth contours
+    """
+    bin_img = sieve(bin_img, size=20)
+    bin_img = cv2.medianBlur(bin_img, ksize=3)
+    bin_img = (bin_img > 0.55).astype(np.uint8)
+    bin_img = cv2.morphologyEx(bin_img, cv2.MORPH_DILATE, kernel=np.ones((5, 5), dtype=np.uint8), iterations=1)
     return bin_img
 
 
@@ -153,3 +253,13 @@ def mask_postprocessing(labels_image, class_pp_func_list):
         else:
             out[:,:,i] = labels_image[:,:,i]
     return out
+
+
+def shape_postprocessing(all_classes_polygons, class_shape_pp_func_list):
+    output = {}
+    for k in all_classes_polygons:
+        if k in class_shape_pp_func_list:
+            output[k] = class_shape_pp_func_list[k](all_classes_polygons[k])
+        else:
+            output[k] = all_classes_polygons[k]
+    return output

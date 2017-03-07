@@ -188,7 +188,10 @@ def get_gradient(im):
     return grad
 
 
-def compute_alignment_warp_matrix(img_master, img_slave, roi, warp_mode=cv2.MOTION_TRANSLATION):
+def compute_alignment_warp_matrix(img_master, img_slave, roi,
+                                  use_gradients=True,
+                                  warp_mode=cv2.MOTION_TRANSLATION,
+                                  err=0.01, nb_iters=5000):
     """
     Code taken from http://www.learnopencv.com/image-alignment-ecc-in-opencv-c-python/
     """
@@ -201,10 +204,19 @@ def compute_alignment_warp_matrix(img_master, img_slave, roi, warp_mode=cv2.MOTI
     img_master_roi = img_master[roi[1]:roi[3], roi[0]:roi[2]].astype(np.float32)
     img_master_roi = cv2.resize(img_master_roi, dsize=(img_slave_roi.shape[1], img_slave_roi.shape[0]))
 
-    img_master_roi = get_gradient(img_master_roi)
-    img_slave_roi = get_gradient(img_slave_roi)
+    if use_gradients:
+        img_master_roi = get_gradient(img_master_roi)
+        img_slave_roi = get_gradient(img_slave_roi)
 
     height, width, ll = img_slave.shape
+
+    from visu_utils import plt_st, display_img_1b, plt
+
+    plt_st(12, 6)
+    plt.subplot(121)
+    display_img_1b(img_master_roi[:, :, 0])
+    plt.subplot(122)
+    display_img_1b(img_slave_roi[:, :, 0])
 
     # Set the warp matrix to identity.
     if warp_mode == cv2.MOTION_HOMOGRAPHY:
@@ -220,7 +232,7 @@ def compute_alignment_warp_matrix(img_master, img_slave, roi, warp_mode=cv2.MOTI
         else:
             warp_matrix = np.eye(2, 3, dtype=np.float32)
         # Set the stopping criteria for the algorithm.
-        criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 5000, 0.01)
+        criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, nb_iters, err)
         try:
             cc, warp_matrix = cv2.findTransformECC(img_master_roi,
                                                    img_slave_roi[:, :, i],
@@ -237,34 +249,36 @@ def compute_alignment_warp_matrix(img_master, img_slave, roi, warp_mode=cv2.MOTI
     return mean_warp_matrix
 
 
-def compute_aligned_image(img_master, img_slave):
+def compute_mean_warp_matrix(img_master, img_slave, roi_size=(500, 500), warp_mode=cv2.MOTION_TRANSLATION, **kwargs):
     # Compute mean warp matrix
-    roi=[0,0,500,500]
-    warp_mode = cv2.MOTION_TRANSLATION
-    mean_warp_matrix = np.zeros((2, 3), dtype=np.float32)
-    mean_warp_matrix[0, 0] = 1.0
-    mean_warp_matrix[1, 1] = 1.0
+    roi = [0, 0, roi_size[0], roi_size[1]]
+    mean_warp_matrix = np.eye(2, 3, dtype=np.float32)
     tx = []
     ty = []
     n = 3
     for i in range(n):
         for j in range(n):
-            warp_matrix = compute_alignment_warp_matrix(img_master, img_slave, roi=roi, warp_mode=warp_mode)
+            warp_matrix = compute_alignment_warp_matrix(img_master, img_slave, roi=roi, warp_mode=warp_mode, **kwargs)
             tx.append(warp_matrix[0, 2])
             ty.append(warp_matrix[1, 2])
-            roi[0] = i * 500
-            roi[1] = j * 500
+            roi[0] = i * roi_size[0]
+            roi[1] = j * roi_size[1]
             roi[2] += roi[0]
             roi[3] += roi[1]
 
+    print tx, ty
     tx = np.median(tx)
     ty = np.median(ty)
     mean_warp_matrix[0, 2] = tx
     mean_warp_matrix[1, 2] = ty
+    return mean_warp_matrix
 
-    #print "mean_warp_matrix :"
-    #print mean_warp_matrix
 
+def compute_aligned_image(img_master, img_slave):
+
+    mean_warp_matrix = compute_mean_warp_matrix(img_master, img_slave,
+                                                roi_size=(500, 500),
+                                                warp_mode=cv2.MOTION_TRANSLATION)
     img_slave_aligned = np.zeros_like(img_slave)
     height, width, ll = img_slave.shape
     for i in range(ll):

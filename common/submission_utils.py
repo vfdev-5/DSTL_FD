@@ -185,12 +185,15 @@ def write_shp_from_mask(filename, image_id, labels_image, epsilon=0, min_area=0.
     write_shp_from_polygons(filename, image_id, all_scaled_polygons)
 
 
-def rewrite_submission(input_csv_filename, output_csv_file, postproc_single_class_functions):
+def rewrite_submission(input_csv_filename, output_csv_file,
+                       postproc_single_class_mask_functions,
+                       postproc_single_class_shape_functions):
     """
 
     :param input_csv_filename:
     :param output_csv_file:
-    :param postproc_single_class_functions: { i: pp_class_1_func }
+    :param postproc_single_class_mask_functions: { i: pp_class_1_func } work with mask images
+    :param postproc_single_class_shape_functions: { i: pp_class_1_func } work on polygons
     :return:
     """
     empty_polygon = 'MULTIPOLYGON EMPTY'
@@ -214,18 +217,27 @@ def rewrite_submission(input_csv_filename, output_csv_file, postproc_single_clas
                     f_out.write(_unprocess(data_csv[i]))
                     continue
 
-                if class_index in postproc_single_class_functions:
+                b1 = class_index in postproc_single_class_shape_functions
+                b2 = class_index in postproc_single_class_mask_functions
+
+                if b1 or b2:
                     polygons = loads(data_csv[i][2])
-                    scaled_polygons = scale(polygons, xfact=x_scaler, yfact=y_scaler, origin=(0, 0, 0))
-                    one_class_mask = np.zeros((h, w), np.uint8)
-                    for polygon in scaled_polygons:
-                        exterior = [round_coords(polygon.exterior.coords)]
-                        cv2.fillPoly(one_class_mask, exterior, 1)
-                        if len(polygon.interiors) > 0:
-                            interiors = [round_coords(poly.coords) for poly in polygon.interiors]
-                            cv2.fillPoly(one_class_mask, interiors, 0)
-                    pp_one_class_mask = postproc_single_class_functions[class_index](one_class_mask)
-                    polygons = mask_to_polygons(pp_one_class_mask, epsilon=1.0, min_area=0.1)
+                    polygons = scale(polygons, xfact=x_scaler, yfact=y_scaler, origin=(0, 0, 0))
+
+                    if b1:
+                        polygons = postproc_single_class_shape_functions[class_index](polygons, image_id=image_id)
+
+                    if b2:
+                        one_class_mask = np.zeros((h, w), np.uint8)
+                        for polygon in polygons:
+                            exterior = [round_coords(polygon.exterior.coords)]
+                            cv2.fillPoly(one_class_mask, exterior, 1)
+                            if len(polygon.interiors) > 0:
+                                interiors = [round_coords(poly.coords) for poly in polygon.interiors]
+                                cv2.fillPoly(one_class_mask, interiors, 0)
+                        pp_one_class_mask = postproc_single_class_mask_functions[class_index](one_class_mask, image_id=image_id)
+                        polygons = mask_to_polygons(pp_one_class_mask, epsilon=1.0, min_area=0.1)
+
                     if len(polygons) == 0:
                         line = ",".join([image_id, str(class_index), empty_polygon]) + "\r\n"
                         f_out.write(line)
