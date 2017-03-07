@@ -199,30 +199,28 @@ def compute_alignment_warp_matrix(img_master, img_slave, roi,
     fy = img_master.shape[0] * 1.0 / img_slave.shape[0]
     roi_slave = [int(roi[0] / fx), int(roi[1] / fy), int(roi[2] / fx), int(roi[3] / fy)]
 
-    img_slave_roi = img_slave[roi_slave[1]:roi_slave[3], roi_slave[0]:roi_slave[2], :].astype(np.float32)
+    if len(img_master.shape) == 2:
+        img_master = img_master[:, :, None]
+    if len(img_slave.shape) == 2:
+        img_slave = img_slave[:, :, None]
 
-    img_master_roi = img_master[roi[1]:roi[3], roi[0]:roi[2]].astype(np.float32)
-    img_master_roi = cv2.resize(img_master_roi, dsize=(img_slave_roi.shape[1], img_slave_roi.shape[0]))
+    img_slave_roi = img_slave[roi_slave[1]:roi_slave[3], roi_slave[0]:roi_slave[2], :].astype(np.float32)
+    img_master_roi = img_master[roi[1]:roi[3], roi[0]:roi[2], :].astype(np.float32)
+    img_master_roi = cv2.resize(img_master_roi, dsize=(img_slave_roi.shape[1], img_slave_roi.shape[0]), interpolation=cv2.INTER_LINEAR)
 
     if use_gradients:
         img_master_roi = get_gradient(img_master_roi)
         img_slave_roi = get_gradient(img_slave_roi)
-
-    height, width, ll = img_slave.shape
-
-    from visu_utils import plt_st, display_img_1b, plt
-
-    plt_st(12, 6)
-    plt.subplot(121)
-    display_img_1b(img_master_roi[:, :, 0])
-    plt.subplot(122)
-    display_img_1b(img_slave_roi[:, :, 0])
 
     # Set the warp matrix to identity.
     if warp_mode == cv2.MOTION_HOMOGRAPHY:
         mean_warp_matrix = np.zeros((3, 3), dtype=np.float32)
     else:
         mean_warp_matrix = np.zeros((2, 3), dtype=np.float32)
+
+    height, width, ll = img_slave.shape
+    _, _, ll2 = img_master.shape
+    img_master_channels = [0] * ll if ll != ll2 else list(range(ll))
 
     for i in range(ll):
 
@@ -234,7 +232,7 @@ def compute_alignment_warp_matrix(img_master, img_slave, roi,
         # Set the stopping criteria for the algorithm.
         criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, nb_iters, err)
         try:
-            cc, warp_matrix = cv2.findTransformECC(img_master_roi,
+            cc, warp_matrix = cv2.findTransformECC(img_master_roi[:, :, img_master_channels[i]],
                                                    img_slave_roi[:, :, i],
                                                    warp_matrix,
                                                    warp_mode,
@@ -263,8 +261,8 @@ def compute_mean_warp_matrix(img_master, img_slave, roi_size=(500, 500), warp_mo
             ty.append(warp_matrix[1, 2])
             roi[0] = i * roi_size[0]
             roi[1] = j * roi_size[1]
-            roi[2] += roi[0]
-            roi[3] += roi[1]
+            roi[2] = roi[0] + roi_size[0]
+            roi[3] = roi[1] + roi_size[1]
 
     print tx, ty
     tx = np.median(tx)

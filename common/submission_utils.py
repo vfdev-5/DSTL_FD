@@ -254,39 +254,3 @@ def rewrite_submission(input_csv_filename, output_csv_file,
     f_out.close()
 
 
-def rewrite_submission2(input_csv_filename, output_csv_file, postproc_function):
-    empty_polygon = 'MULTIPOLYGON EMPTY'
-
-    data_iterator = submission_iterator(input_csv_filename)
-
-    f_out = open(output_csv_file, 'w')
-
-    f_out.write('ImageId,ClassType,MultipolygonWKT\r\n')
-    try:
-        index = 0
-        for data_csv in data_iterator:
-            print "--", data_csv[0][0], len(data_csv), index
-            image_id = data_csv[0][0]
-
-            polygons = get_scaled_polygons(data_csv)
-            labels_image = compute_label_image(image_id, polygons)
-            pp_labels_image = postproc_function(labels_image)
-
-            x_scaler, y_scaler = get_scalers(image_id, pp_labels_image.shape[0], pp_labels_image.shape[1])
-            for class_index in range(1, len(LABELS)):
-
-                polygons = mask_to_polygons(pp_labels_image[:, :, class_index - 1], epsilon=0.0, min_area=0.1)
-                if len(polygons) == 0:
-                    line = ",".join([image_id, str(class_index), empty_polygon]) + "\r\n"
-                    f_out.write(line)
-                else:
-                    unit_polygons = scale(polygons, xfact=1.0 / x_scaler, yfact=1.0 / y_scaler, origin=(0, 0, 0))
-                    line = ",".join([image_id, str(class_index), "\"" + dumps(unit_polygons) + "\""]) + "\r\n"
-                    f_out.write(line)
-            index += 1
-
-    except KeyboardInterrupt:
-        pass
-
-    f_out.close()
-
