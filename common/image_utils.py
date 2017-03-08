@@ -264,7 +264,6 @@ def compute_mean_warp_matrix(img_master, img_slave, roi_size=(500, 500), warp_mo
             roi[2] = roi[0] + roi_size[0]
             roi[3] = roi[1] + roi_size[1]
 
-    print tx, ty
     tx = np.median(tx)
     ty = np.median(ty)
     mean_warp_matrix[0, 2] = tx

@@ -8,8 +8,10 @@ import cv2
 
 from shapely.wkt import loads
 from shapely.affinity import scale
-from shapely.geometry import mapping
+from shapely.geometry import mapping, Polygon, MultiPolygon
 from shapely.wkt import dumps
+from shapely.affinity import translate
+
 import fiona
 
 
@@ -18,6 +20,7 @@ sys.path.append("../common/")
 from data_utils import get_scalers, LABELS
 from image_utils import get_image_data
 from data_utils import mask_to_polygons
+from image_utils import compute_mean_warp_matrix
 
 
 def _process(line):
@@ -225,6 +228,8 @@ def rewrite_submission(input_csv_filename, output_csv_file,
                     polygons = scale(polygons, xfact=x_scaler, yfact=y_scaler, origin=(0, 0, 0))
 
                     if b1:
+                        if isinstance(polygons, Polygon):
+                            polygons = MultiPolygon([polygons])
                         polygons = postproc_single_class_shape_functions[class_index](polygons, image_id=image_id)
 
                     if b2:
@@ -253,4 +258,152 @@ def rewrite_submission(input_csv_filename, output_csv_file,
 
     f_out.close()
 
+
+def merge_pair_images(pair_images, csv_filename, class_merge_polygons_funcs, merge_labels=(7,)):
+    def _translate(polygons, tx, ty):
+        polygons_out = {}
+        for k in polygons:
+            polygons_out[k] = translate(polygons[k], xoff=tx, yoff=ty)
+        return polygons_out
+
+    n, m = (5, 5)
+    l = len(pair_images)
+    data_csv_1_array = np.empty((l, n, m), dtype=list)
+    data_csv_2_array = np.empty((l, n, m), dtype=list)
+    for data_csv in submission_iterator(csv_filename):
+        for k, pair in enumerate(pair_images):
+            for i in range(n):
+                for j in range(m):
+                    image_id_1 = pair[0] + "_%i_%i" % (i, j)
+                    if data_csv[0][0] == image_id_1:
+                        data_csv_1_array[k, i, j] = list(data_csv)
+                    image_id_2 = pair[1] + "_%i_%i" % (i, j)
+                    if data_csv[0][0] == image_id_2:
+                        data_csv_2_array[k, i, j] = list(data_csv)
+
+    n, m = (5, 5)
+    results = {}
+    for k, pair in enumerate(pair_images):
+        for i in range(n):
+            for j in range(m):
+
+                image_id_1 = pair[0] + "_%i_%i" % (i, j)
+                image_id_2 = pair[1] + "_%i_%i" % (i, j)
+                print "---", image_id_1, image_id_2
+
+                # Get polygons
+                #data_csv_1 = get_data_csv(image_id_1, csv_filename)
+                #data_csv_2 = get_data_csv(image_id_2, csv_filename)
+                data_csv_1 = data_csv_1_array[k, i, j]
+                data_csv_2 = data_csv_2_array[k, i, j]
+
+                if data_csv_1 is None or data_csv_2 is None:
+                    continue
+
+                assert data_csv_1[0][0] == image_id_1 and data_csv_2[0][0] == image_id_2, \
+                    "Wrong data: {}, {}, {}, {}".format(data_csv_1[0][0], image_id_1, data_csv_2[0][0], image_id_2)
+
+                polygons_1 = get_scaled_polygons(data_csv_1, '3b')
+                polygons_2 = get_scaled_polygons(data_csv_2, '3b')
+
+                _proceed = False
+                for index in merge_labels:
+                    if index in polygons_1 and index in polygons_2:
+                        _proceed = True
+                        break
+
+                if not _proceed:
+                    continue
+
+                print "--- merge ..."
+                # Compute translations from image_3b_2 to image_3b_1
+                image_3b_1 = get_image_data(image_id_1, '3b')
+                image_3b_2 = get_image_data(image_id_2, '3b')
+                roi_size = (150, 150)
+                warp_matrix_12 = compute_mean_warp_matrix(image_3b_1, image_3b_2,
+                                                          roi_size=roi_size, err=0.01,
+                                                          use_gradients=False)
+                tx_12 = warp_matrix_12[0, 2]
+                ty_12 = warp_matrix_12[1, 2]
+                # print " tx_12, ty_12 :", tx_12, ty_12
+
+                # Merge polygons of data_csv_2 to data_csv_1
+                polygons_2_1 = _translate(polygons_2, -tx_12, -ty_12)
+                polygons_1_2 = _translate(polygons_1, tx_12, ty_12)
+                polygons_1_merged = {}
+                polygons_2_merged = {}
+                for index in merge_labels:
+
+                    if index in polygons_1 and index in polygons_2:
+                        # Merge polygons of data_csv_2 to data_csv_1
+                        if not polygons_1[index].is_valid:
+                            polygons_1[index] = polygons_1[index].buffer(0)
+                        if not polygons_2[index].is_valid:
+                            polygons_2[index] = polygons_2[index].buffer(0)
+                        if not polygons_2_1[index].is_valid:
+                            polygons_2_1[index] = polygons_2_1[index].buffer(0)
+                        if not polygons_1_2[index].is_valid:
+                            polygons_1_2[index] = polygons_1_2[index].buffer(0)
+
+                        polygons_1_merged[index] = class_merge_polygons_funcs[index](polygons_1[index], polygons_2_1[index])
+                        polygons_2_merged[index] = class_merge_polygons_funcs[index](polygons_2[index], polygons_1_2[index])
+
+                results[image_id_1] = polygons_1_merged
+                results[image_id_2] = polygons_2_merged
+    return results
+
+
+def rewrite_submission_with_new_polygons(input_csv_filename, output_csv_file, image_id_new_polygons):
+    """
+    :param image_id_new_polygons: {'image_id': {'class_label': MultiPolygon, ...}, ... }
+    """
+    empty_polygon = 'MULTIPOLYGON EMPTY'
+
+    data_iterator = submission_iterator(input_csv_filename)
+
+    f_out = open(output_csv_file, 'w')
+
+    f_out.write("ImageId,ClassType,MultipolygonWKT\r\n")
+    try:
+        index = 0
+        for data_csv in data_iterator:
+            print "--", data_csv[0][0], len(data_csv), index
+            index += 1
+            image_id = data_csv[0][0]
+
+            if image_id not in image_id_new_polygons:
+                for i, class_index in enumerate(range(1, len(LABELS))):
+                    # Write as it is
+                    f_out.write(_unprocess(data_csv[i]))
+                    # print "---> ", i, class_index
+                continue
+
+            h, w, _ = get_image_data(image_id, '3b', return_shape_only=True)
+            x_scaler, y_scaler = get_scalers(image_id, h, w)
+            new_polygons = image_id_new_polygons[image_id]
+            for i, class_index in enumerate(range(1, len(LABELS))):
+
+                if class_index not in new_polygons:
+                    # Write as it is
+                    f_out.write(_unprocess(data_csv[i]))
+                    # print "===> ", i, class_index
+                    continue
+
+                polygons = new_polygons[class_index]
+                # print class_index, new_polygons, type(new_polygons[class_index]), len(new_polygons[class_index])
+
+                if polygons.area == 0.0: #len(polygons) == 0:
+                    line = ",".join([image_id, str(class_index), empty_polygon]) + "\r\n"
+                    f_out.write(line)
+                    # print "++++ empty", class_index
+                else:
+                    unit_polygons = scale(polygons, xfact=1.0 / x_scaler, yfact=1.0 / y_scaler, origin=(0, 0, 0))
+                    line = ",".join([image_id, str(class_index), "\"" + dumps(unit_polygons) + "\""]) + "\r\n"
+                    f_out.write(line)
+                    # print "++++ new", class_index
+            index += 1
+    except KeyboardInterrupt:
+        pass
+
+    f_out.close()
 
